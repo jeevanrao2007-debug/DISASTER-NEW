@@ -221,9 +221,11 @@ async function sendEmailAlerts({ type, severity, description, lat, lng }) {
   const gmailPass = process.env.GMAIL_APP_PASSWORD;
 
   if (!gmailUser || !gmailPass) {
-    console.warn("[alert] Email env vars missing — skipping email");
+    console.warn("[email-diag] GMAIL_USER or GMAIL_APP_PASSWORD not set in Vercel env vars.");
     return { skipped: true, reason: "env_missing" };
   }
+
+  console.info(`[email-diag] Processing ${type} alert (${severity}).`);
 
   // Fetch subscriber list (stored under fcm_tokens to access location)
   const db = getAdminDb();
@@ -256,7 +258,12 @@ async function sendEmailAlerts({ type, severity, description, lat, lng }) {
   // Deduplicate emails
   const emails = [...new Set(recipients)];
 
-  if (emails.length === 0) return { sent: 0, reason: "no_subscribers_in_radius" };
+  console.info(`[email-diag] Recipients found: ${emails.length} (From DB: ${entries.length} fcm, ${Object.keys(emailSubs).length} subscribers)`);
+
+  if (emails.length === 0) {
+    console.info("[email-diag] No matching subscribers found for this location/severity.");
+    return { sent: 0, reason: "no_subscribers_in_radius" };
+  }
 
   const transporter = nodemailer.createTransport({
     service: "gmail",
@@ -278,8 +285,15 @@ async function sendEmailAlerts({ type, severity, description, lat, lng }) {
   );
 
   const sent = results.filter(r => r.status === "fulfilled").length;
-  const failed = results.filter(r => r.status === "rejected").length;
-  return { sent, failed, total: emails.length };
+  const failedResults = results.filter(r => r.status === "rejected");
+  const failedCount = failedResults.length;
+
+  if (failedCount > 0) {
+    failedResults.forEach((r, idx) => console.error(`[email-diag] Delivery error #${idx + 1}:`, r.reason));
+  }
+
+  console.info(`[email-diag] Emails sent: ${sent}, Failed: ${failedCount}`);
+  return { sent, failed: failedCount, total: emails.length };
 }
 
 /* ── HANDLER ──────────────────────────────────────────── */
