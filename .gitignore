@@ -1,0 +1,10 @@
+node_modules/
+server/node_modules/
+serviceAccountKey.json
+.env
+.DS_Store
+server/serviceAccountKey.json
+*.log
+dist/
+build/
+.vscode/
