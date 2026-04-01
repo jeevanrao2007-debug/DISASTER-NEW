@@ -12,15 +12,13 @@ firebase.initializeApp({
 const messaging = firebase.messaging();
 
 messaging.onBackgroundMessage(payload => {
-
   self.registration.showNotification(
     payload.notification.title,
     {
       body: payload.notification.body,
       icon: "/icon.png",
-      vibrate: [200,100,200,100,200],
+      vibrate: [200, 100, 200, 100, 200],
       requireInteraction: true
     }
   );
-
 });
