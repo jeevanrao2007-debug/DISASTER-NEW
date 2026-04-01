@@ -1,0 +1,828 @@
+/* =========================================================
+   COMMAND CENTER — GLOBAL DESIGN SYSTEM
+   All tokens, utilities, and shared components
+   ========================================================= */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+/* ── CSS TOKENS ─────────────────────────────────────────── */
+:root {
+  /* Background scale */
+  --bg-void:      #010409;
+  --bg-deep:      #020617;
+  --bg-panel:     rgba(2,6,23,0.92);
+  --bg-card:      rgba(15,23,42,0.85);
+  --bg-hover:     rgba(30,41,59,0.7);
+
+  /* Accent scale */
+  --blue:         #3b82f6;
+  --blue-dim:     #1d4ed8;
+  --blue-glow:    rgba(59,130,246,0.25);
+  --cyan:         #06b6d4;
+  --cyan-glow:    rgba(6,182,212,0.2);
+
+  /* Severity */
+  --low:          #22c55e;
+  --moderate:     #facc15;
+  --high:         #fb923c;
+  --critical:     #ef4444;
+  --low-glow:     rgba(34,197,94,0.35);
+  --moderate-glow:rgba(250,204,21,0.35);
+  --high-glow:    rgba(251,146,60,0.35);
+  --critical-glow:rgba(239,68,68,0.40);
+
+  /* Borders */
+  --border:       rgba(30,41,59,0.8);
+  --border-bright:rgba(59,130,246,0.3);
+
+  /* Typography */
+  --text-primary: #e2e8f0;
+  --text-muted:   #94a3b8;
+  --text-dim:     #475569;
+
+  /* Spacing */
+  --gap-xs: 4px; --gap-sm: 8px; --gap-md: 14px; --gap-lg: 20px; --gap-xl: 30px;
+
+  /* Radii */
+  --r-sm:8px; --r-md:12px; --r-lg:18px; --r-xl:24px;
+
+  /* Shadow */
+  --shadow-sm:  0 4px 16px rgba(0,0,0,.4);
+  --shadow-md:  0 10px 36px rgba(0,0,0,.55);
+  --shadow-lg:  0 20px 60px rgba(0,0,0,.7);
+  --shadow-blue:0 0 24px rgba(59,130,246,.2);
+
+  /* Durations */
+  --dur-fast:.15s; --dur-base:.25s; --dur-slow:.4s;
+}
+
+/* ── RESET & BASE ───────────────────────────────────────── */
+*, *::before, *::after { box-sizing:border-box; }
+
+html, body {
+  height:100%;
+  margin:0;
+  font-family:'Inter', system-ui, sans-serif;
+  font-size:14px;
+  background: var(--bg-void);
+  color: var(--text-primary);
+  overflow:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+
+/* ── MAP LAYER ──────────────────────────────────────────── */
+#map {
+  position:absolute;
+  top:64px;
+  bottom:0;
+  left:0;
+  right:0;
+  z-index:1;
+  /* [UPGRADE] subtle scanline texture overlay */
+  background-color:#0b1629;
+}
+
+/* [UPGRADE] Subtle vignette over map for depth */
+#map::after {
+  content:'';
+  position:absolute;
+  inset:0;
+  background: radial-gradient(ellipse at center, transparent 55%, rgba(1,4,9,0.55) 100%);
+  pointer-events:none;
+  z-index:2;
+}
+
+/* ── TOP NAVBAR ─────────────────────────────────────────── */
+.topbar {
+  position:fixed;
+  top:0; left:0; right:0;
+  height:64px;
+  padding:0 24px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  /* [UPGRADE] richer gradient with subtle cyan tint on left */
+  background:linear-gradient(90deg, #010c1f 0%, #020617 50%, #050d1f 100%);
+  border-bottom:1px solid var(--border);
+  /* [UPGRADE] bottom glow line */
+  box-shadow: 0 1px 0 rgba(59,130,246,0.12), 0 4px 24px rgba(0,0,0,0.6);
+  font-size:18px;
+  font-weight:600;
+  letter-spacing:.5px;
+  z-index:1200;
+}
+
+/* [UPGRADE] Topbar brand section */
+.topbar-brand {
+  display:flex;
+  align-items:center;
+  gap:10px;
+  font-size:17px;
+  font-weight:700;
+  letter-spacing:.6px;
+  color: var(--text-primary);
+}
+
+/* [UPGRADE] Heartbeat indicator dot */
+.heartbeat-dot {
+  width:9px;
+  height:9px;
+  border-radius:50%;
+  background: var(--low);
+  box-shadow: 0 0 8px var(--low-glow);
+  flex-shrink:0;
+  animation: hb-pulse 2s ease-in-out infinite;
+}
+.heartbeat-dot.offline {
+  background:#475569;
+  box-shadow:none;
+  animation:none;
+}
+@keyframes hb-pulse {
+  0%,100%{ opacity:1; transform:scale(1); }
+  50%     { opacity:.45; transform:scale(.75); }
+}
+
+/* [UPGRADE] Topbar right cluster */
+.topbar-right {
+  display:flex;
+  align-items:center;
+  gap:12px;
+}
+
+/* [UPGRADE] System status chip */
+.sys-status {
+  display:flex;
+  align-items:center;
+  gap:6px;
+  font-size:11px;
+  font-weight:500;
+  color: var(--text-muted);
+  font-family:'JetBrains Mono', monospace;
+  letter-spacing:.3px;
+}
+
+.topbar a, .topbar button {
+  background: rgba(37,99,235,0.15);
+  color: var(--blue);
+  border:1px solid rgba(59,130,246,0.3);
+  padding:7px 16px;
+  border-radius: var(--r-sm);
+  text-decoration:none;
+  cursor:pointer;
+  transition: background var(--dur-base), box-shadow var(--dur-base), transform var(--dur-fast);
+  font-size:13px;
+  font-weight:600;
+  letter-spacing:.3px;
+}
+
+.topbar a:hover, .topbar button:hover {
+  background: rgba(37,99,235,0.30);
+  box-shadow: 0 0 14px var(--blue-glow);
+  transform:translateY(-1px);
+}
+
+/* ── GLASS CONTROL PANEL (ADMIN) ───────────────────────── */
+.panel {
+  position:absolute;
+  top:80px;
+  left:16px;
+  width:270px;
+  max-height:calc(100vh - 100px);
+  overflow-y:auto;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  /* [UPGRADE] premium glass */
+  background: var(--bg-panel);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border:1px solid var(--border);
+  border-top:1px solid rgba(59,130,246,0.15);
+  border-radius: var(--r-lg);
+  padding:18px;
+  box-shadow: var(--shadow-lg), inset 0 1px 0 rgba(255,255,255,0.04);
+  z-index:1300;
+  /* [UPGRADE] smooth scrollbar */
+  scrollbar-width:thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+.panel::-webkit-scrollbar { width:4px; }
+.panel::-webkit-scrollbar-track { background:transparent; }
+.panel::-webkit-scrollbar-thumb { background:var(--border); border-radius:4px; }
+
+/* [UPGRADE] Panel section headings */
+.panel h3 {
+  margin:4px 0 6px 0;
+  font-size:11px;
+  font-weight:600;
+  text-transform:uppercase;
+  letter-spacing:1.2px;
+  color: var(--text-muted);
+  border-bottom:1px solid var(--border);
+  padding-bottom:6px;
+}
+
+/* ── INPUTS ──────────────────────────────────────────────── */
+select, input, textarea {
+  width:100%;
+  padding:9px 12px;
+  border-radius: var(--r-sm);
+  border:1px solid var(--border);
+  background: rgba(2,6,23,0.7);
+  color: var(--text-primary);
+  font-size:13px;
+  font-family:'Inter', sans-serif;
+  transition: border-color var(--dur-base), box-shadow var(--dur-base);
+}
+
+select:focus, input:focus, textarea:focus {
+  outline:none;
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px var(--blue-glow);
+}
+
+/* ── BUTTONS ─────────────────────────────────────────────── */
+button {
+  padding:9px 14px;
+  border-radius: var(--r-sm);
+  border:none;
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  color:white;
+  font-weight:600;
+  font-size:13px;
+  cursor:pointer;
+  transition: transform var(--dur-fast), box-shadow var(--dur-base), background var(--dur-base);
+  position:relative;
+  overflow:hidden;
+}
+
+button:hover {
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  box-shadow: 0 0 20px var(--blue-glow);
+  transform:translateY(-1px);
+}
+
+button:active { transform:scale(.96); }
+
+/* [UPGRADE] PUBLISH button — accent style */
+#publishBtn {
+  background: linear-gradient(135deg, #dc2626, #b91c1c);
+  font-size:13px;
+  letter-spacing:.4px;
+  transition: transform var(--dur-fast), box-shadow var(--dur-base);
+}
+
+#publishBtn:hover {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  box-shadow: 0 0 20px var(--critical-glow);
+}
+
+/* [UPGRADE] Publish ripple shimmer */
+#publishBtn::after {
+  content:'';
+  position:absolute;
+  top:-50%; left:-60%;
+  width:60%; height:200%;
+  background:rgba(255,255,255,0.08);
+  transform:skewX(-20deg);
+  transition:left .5s;
+}
+#publishBtn:hover::after { left:110%; }
+
+/* Popup delete button */
+.leaflet-popup-content button {
+  margin-top:8px;
+  width:100%;
+  background: linear-gradient(135deg,#dc2626,#b91c1c);
+}
+.leaflet-popup-content button:hover {
+  background: linear-gradient(135deg,#ef4444,#dc2626);
+  box-shadow:0 0 14px var(--critical-glow);
+}
+
+/* ── APPROVE / REJECT BUTTONS ───────────────────────────── */
+.btn-approve {
+  background: linear-gradient(135deg,#16a34a,#15803d) !important;
+  font-size:12px !important;
+  padding:6px 12px !important;
+}
+.btn-approve:hover {
+  background: linear-gradient(135deg,#22c55e,#16a34a) !important;
+  box-shadow:0 0 14px var(--low-glow) !important;
+}
+
+.btn-reject {
+  background: rgba(127,29,29,0.4) !important;
+  border:1px solid rgba(239,68,68,0.3) !important;
+  color: var(--critical) !important;
+  font-size:12px !important;
+  padding:6px 12px !important;
+}
+.btn-reject:hover {
+  background: rgba(185,28,28,0.35) !important;
+  box-shadow:0 0 14px var(--critical-glow) !important;
+}
+
+/* ── COORDS / STATUS TEXT ────────────────────────────────── */
+#coords {
+  font-size:11px;
+  color: var(--text-dim);
+  font-family:'JetBrains Mono', monospace;
+  letter-spacing:.2px;
+}
+
+#status {
+  font-size:12px;
+  color: var(--low);
+  font-weight:500;
+  min-height:16px;
+}
+
+/* ── PENDING ALERT CARDS ─────────────────────────────────── */
+/* [UPGRADE] Interactive pending card with hover expand */
+.pending-card {
+  background: var(--bg-card);
+  border:1px solid var(--border);
+  border-radius: var(--r-md);
+  padding:10px 12px;
+  margin-bottom:8px;
+  cursor:default;
+  transition: border-color var(--dur-base), box-shadow var(--dur-base), transform var(--dur-base);
+  position:relative;
+  overflow:hidden;
+}
+
+.pending-card::before {
+  content:'';
+  position:absolute;
+  left:0; top:0; bottom:0;
+  width:3px;
+  border-radius:4px 0 0 4px;
+  background: var(--moderate);
+}
+.pending-card[data-level="Low"]::before      { background:var(--low); }
+.pending-card[data-level="High"]::before     { background:var(--high); }
+.pending-card[data-level="Critical"]::before { background:var(--critical); }
+
+.pending-card:hover {
+  border-color: var(--border-bright);
+  box-shadow: 0 0 18px rgba(59,130,246,0.12);
+  transform:translateY(-2px);
+}
+
+.pending-card-title {
+  font-size:13px;
+  font-weight:600;
+  margin-bottom:3px;
+}
+
+.pending-card-meta {
+  font-size:11px;
+  color: var(--text-muted);
+  font-family:'JetBrains Mono', monospace;
+  margin-bottom:8px;
+}
+
+.pending-card-actions {
+  display:flex;
+  gap:6px;
+}
+
+/* [UPGRADE] Approve slide-out animation */
+@keyframes card-approve {
+  0%   { opacity:1; transform:translateX(0) scaleY(1); max-height:200px; }
+  60%  { opacity:.5; transform:translateX(30px) scaleY(1); }
+  100% { opacity:0; transform:translateX(60px) scaleY(0); max-height:0; padding:0; margin:0; }
+}
+
+/* [UPGRADE] Reject collapse animation */
+@keyframes card-reject {
+  0%   { opacity:1; transform:scaleY(1); max-height:200px; }
+  100% { opacity:0; transform:scaleY(0); max-height:0; padding:0; margin:0; }
+}
+
+.pending-card.approving { animation:card-approve .45s ease forwards; }
+.pending-card.rejecting { animation:card-reject  .35s ease forwards; }
+
+/* ── ACTIVITY STREAM PANEL ──────────────────────────────── */
+/* [UPGRADE] Live event feed panel */
+#activityPanel {
+  position:absolute;
+  bottom:24px;
+  left:16px;
+  width:280px;
+  background: var(--bg-panel);
+  backdrop-filter:blur(20px) saturate(160%);
+  -webkit-backdrop-filter:blur(20px) saturate(160%);
+  border:1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding:14px 16px;
+  z-index:1300;
+  box-shadow: var(--shadow-md);
+  max-height:200px;
+  display:flex;
+  flex-direction:column;
+}
+
+#activityPanel h4 {
+  margin:0 0 8px 0;
+  font-size:10px;
+  font-weight:600;
+  text-transform:uppercase;
+  letter-spacing:1.3px;
+  color: var(--text-muted);
+}
+
+#activityList {
+  list-style:none;
+  margin:0;
+  padding:0;
+  overflow-y:auto;
+  display:flex;
+  flex-direction:column;
+  gap:5px;
+  scrollbar-width:none;
+}
+#activityList::-webkit-scrollbar { display:none; }
+
+/* [UPGRADE] Activity entry slide-in */
+.activity-item {
+  font-size:11.5px;
+  color: var(--text-muted);
+  display:flex;
+  align-items:baseline;
+  gap:6px;
+  animation: activity-in .35s ease;
+  padding:3px 0;
+  border-bottom:1px solid rgba(30,41,59,0.4);
+}
+.activity-item:last-child { border-bottom:none; }
+
+.activity-item .ai-dot {
+  width:6px; height:6px;
+  border-radius:50%;
+  background: var(--blue);
+  flex-shrink:0;
+  margin-top:3px;
+}
+.activity-item .ai-dot.green  { background: var(--low); }
+.activity-item .ai-dot.yellow { background: var(--moderate); }
+.activity-item .ai-dot.red    { background: var(--critical); }
+
+.activity-item .ai-time {
+  font-family:'JetBrains Mono', monospace;
+  font-size:10px;
+  color: var(--text-dim);
+  margin-left:auto;
+  flex-shrink:0;
+}
+
+@keyframes activity-in {
+  from { opacity:0; transform:translateX(-12px); }
+  to   { opacity:1; transform:translateX(0); }
+}
+
+/* ── LEGEND (map) ──────────────────────────────────────── */
+/* [UPGRADE] Glass legend panel */
+.legend {
+  position:absolute;
+  bottom:25px;
+  right:20px;
+  background: var(--bg-panel);
+  backdrop-filter:blur(16px);
+  -webkit-backdrop-filter:blur(16px);
+  padding:14px 16px;
+  border-radius: var(--r-md);
+  z-index:999;
+  font-size:12px;
+  line-height:22px;
+  box-shadow: var(--shadow-md);
+  border:1px solid var(--border);
+}
+
+.legend b {
+  font-size:10px;
+  text-transform:uppercase;
+  letter-spacing:1px;
+  color: var(--text-muted);
+  display:block;
+  margin-bottom:6px;
+}
+
+.legend div {
+  display:flex;
+  align-items:center;
+  gap:8px;
+  font-size:12px;
+}
+
+.legend span {
+  width:10px;
+  height:10px;
+  border-radius:50%;
+  display:inline-block;
+  flex-shrink:0;
+}
+
+/* [UPGRADE] Pulsing legend dots */
+.legend span.l-low      { background:var(--low);      box-shadow:0 0 5px var(--low-glow); }
+.legend span.l-moderate { background:var(--moderate);  box-shadow:0 0 5px var(--moderate-glow); }
+.legend span.l-high     { background:var(--high);      box-shadow:0 0 5px var(--high-glow); animation:l-pulse 2s ease-in-out infinite; }
+.legend span.l-critical { background:var(--critical);  box-shadow:0 0 8px var(--critical-glow); animation:l-pulse 1s ease-in-out infinite; }
+
+@keyframes l-pulse {
+  0%,100%{ box-shadow:0 0 5px var(--critical-glow); }
+  50%    { box-shadow:0 0 14px var(--critical-glow); }
+}
+
+/* ── TOAST NOTIFICATIONS ─────────────────────────────── */
+/* [UPGRADE] Slide-in toast system */
+#toastContainer {
+  position:fixed;
+  top:76px;
+  right:20px;
+  z-index:9000;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  pointer-events:none;
+}
+
+.toast {
+  background: var(--bg-card);
+  backdrop-filter:blur(16px);
+  border:1px solid var(--border);
+  border-radius: var(--r-md);
+  padding:12px 16px;
+  min-width:260px;
+  max-width:320px;
+  box-shadow: var(--shadow-md);
+  display:flex;
+  align-items:flex-start;
+  gap:10px;
+  animation: toast-in .35s cubic-bezier(.34,1.56,.64,1) forwards;
+  pointer-events:auto;
+  position:relative;
+  overflow:hidden;
+}
+
+.toast::after {
+  content:'';
+  position:absolute;
+  bottom:0; left:0; right:0;
+  height:2px;
+  transform-origin:left;
+  animation: toast-bar 4s linear forwards;
+}
+.toast.toast-info::after     { background:var(--blue); }
+.toast.toast-success::after  { background:var(--low); }
+.toast.toast-warning::after  { background:var(--high); }
+.toast.toast-critical::after { background:var(--critical); }
+
+.toast-icon { font-size:18px; flex-shrink:0; margin-top:1px; }
+.toast-body { flex:1; }
+.toast-title { font-size:13px; font-weight:600; margin-bottom:2px; }
+.toast-desc  { font-size:11.5px; color:var(--text-muted); }
+
+.toast-dismiss {
+  font-size:16px;
+  color:var(--text-dim);
+  cursor:pointer;
+  background:none;
+  border:none;
+  padding:0;
+  line-height:1;
+  transition:color var(--dur-fast);
+  flex-shrink:0;
+}
+.toast-dismiss:hover { color:var(--text-primary); background:none; box-shadow:none; transform:none; }
+
+@keyframes toast-in {
+  from { opacity:0; transform:translateX(40px) scale(.95); }
+  to   { opacity:1; transform:translateX(0) scale(1); }
+}
+
+@keyframes toast-bar {
+  from { transform:scaleX(1); }
+  to   { transform:scaleX(0); }
+}
+
+.toast.toast-out {
+  animation: toast-out .3s ease forwards;
+}
+@keyframes toast-out {
+  to { opacity:0; transform:translateX(40px) scale(.95); max-height:0; padding:0; margin:0; }
+}
+
+/* ── SCREEN FLASH — CRITICAL ALERT ─────────────────────── */
+/* [UPGRADE] Full-screen red edge flash */
+#criticalFlash {
+  position:fixed;
+  inset:0;
+  pointer-events:none;
+  z-index:8000;
+  border:4px solid var(--critical);
+  border-radius:0;
+  opacity:0;
+  box-shadow: inset 0 0 80px rgba(239,68,68,0.25);
+}
+
+#criticalFlash.active {
+  animation: edge-flash 1.2s ease-in-out infinite;
+}
+
+@keyframes edge-flash {
+  0%,100%{ opacity:0; }
+  45%    { opacity:1; }
+}
+
+/* [UPGRADE] Screen shake for critical */
+@keyframes screen-shake {
+  0%,100%{ transform:translate(0,0); }
+  20%    { transform:translate(-3px,1px); }
+  40%    { transform:translate(3px,-1px); }
+  60%    { transform:translate(-2px,2px); }
+  80%    { transform:translate(2px,-2px); }
+}
+
+.shake-active { animation: screen-shake .5s ease; }
+
+/* ── ALARM STATUS INDICATOR ─────────────────────────────── */
+/* [UPGRADE] Alarm indicator chip in topbar */
+#alarmIndicator {
+  display:none;
+  align-items:center;
+  gap:6px;
+  padding:5px 12px;
+  background: rgba(185,28,28,0.15);
+  border:1px solid rgba(239,68,68,0.4);
+  border-radius:999px;
+  font-size:11px;
+  font-weight:700;
+  color:var(--critical);
+  letter-spacing:.5px;
+  text-transform:uppercase;
+}
+#alarmIndicator.active {
+  display:flex;
+  animation:alarm-blink 1s step-start infinite;
+}
+#alarmIndicator .ai-blink {
+  width:7px; height:7px;
+  border-radius:50%;
+  background:var(--critical);
+  box-shadow:0 0 8px var(--critical-glow);
+}
+@keyframes alarm-blink {
+  0%,100%{ opacity:1; }
+  50%    { opacity:.3; }
+}
+
+/* ── LEAFLET POPUP DARK THEME ─────────────────────────── */
+.leaflet-popup-content-wrapper {
+  background: var(--bg-card);
+  backdrop-filter:blur(16px);
+  color: var(--text-primary);
+  border-radius: var(--r-md);
+  border:1px solid var(--border);
+  box-shadow: var(--shadow-md);
+}
+
+.leaflet-popup-tip { background: var(--bg-card); }
+
+.leaflet-popup-content b { color: var(--text-primary); }
+
+/* ── LOGIN PAGE ─────────────────────────────────────────── */
+.center {
+  height:100vh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  /* [UPGRADE] animated radial gradient */
+  background: radial-gradient(ellipse at 40% 30%, #0c1b3a, var(--bg-void) 70%);
+  overflow:hidden;
+  position:relative;
+}
+
+/* [UPGRADE] Login page animated grid line background */
+.center::before {
+  content:'';
+  position:absolute;
+  inset:0;
+  background-image:
+    linear-gradient(rgba(59,130,246,0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(59,130,246,0.05) 1px, transparent 1px);
+  background-size:40px 40px;
+  animation:grid-drift 20s linear infinite;
+}
+
+@keyframes grid-drift {
+  from { background-position:0 0; }
+  to   { background-position:40px 40px; }
+}
+
+/* [UPGRADE] Glass login card */
+.card {
+  width:340px;
+  padding:38px 34px;
+  display:flex;
+  flex-direction:column;
+  gap:14px;
+  background: var(--bg-panel);
+  backdrop-filter:blur(24px) saturate(160%);
+  -webkit-backdrop-filter:blur(24px) saturate(160%);
+  border-radius: var(--r-xl);
+  border:1px solid var(--border);
+  border-top:1px solid rgba(59,130,246,0.2);
+  box-shadow: var(--shadow-lg), 0 0 60px rgba(59,130,246,0.06);
+  position:relative;
+  z-index:1;
+  animation: card-rise .6s cubic-bezier(.22,1,.36,1);
+}
+
+@keyframes card-rise {
+  from { opacity:0; transform:translateY(24px) scale(.98); }
+  to   { opacity:1; transform:translateY(0) scale(1); }
+}
+
+.card h2 {
+  margin:0 0 4px 0;
+  text-align:center;
+  font-weight:700;
+  font-size:22px;
+  letter-spacing:.4px;
+}
+
+/* [UPGRADE] Subtitle under login heading */
+.card-sub {
+  text-align:center;
+  font-size:12px;
+  color:var(--text-muted);
+  margin-top:-8px;
+  margin-bottom:4px;
+  letter-spacing:.3px;
+}
+
+/* ── SEVERITY UTILITY CLASSES ─────────────────────────── */
+.low      { color:var(--low); }
+.moderate { color:var(--moderate); }
+.high     { color:var(--high); }
+.critical { color:var(--critical); }
+
+/* ── MARKER ANIMATION KEYFRAMES ───────────────────────── */
+
+/* [UPGRADE] Leaflet CSS marker animations via SVG/Canvas overlay trick:
+   These are attached to custom divIcon wrappers injected by JS */
+
+.marker-ring {
+  position:absolute;
+  border-radius:50%;
+  pointer-events:none;
+  transform-origin:center;
+}
+
+/* LOW — soft pulse */
+@keyframes pulse-low {
+  0%,100%{ transform:scale(1); opacity:.8; }
+  50%    { transform:scale(1.18); opacity:.5; }
+}
+
+/* MODERATE — expanding ring */
+@keyframes ring-moderate {
+  0%  { transform:scale(1); opacity:.8; }
+  100%{ transform:scale(2.6); opacity:0; }
+}
+
+/* HIGH — ripple */
+@keyframes ripple-high {
+  0%  { transform:scale(1); opacity:.9; }
+  100%{ transform:scale(3); opacity:0; }
+}
+
+/* CRITICAL — radar sweep */
+@keyframes radar-critical {
+  0%  { transform:scale(1); opacity:1; }
+  100%{ transform:scale(4); opacity:0; }
+}
+
+/* [UPGRADE] New marker scale-in animation */
+@keyframes marker-appear {
+  0%  { transform:scale(0) rotate(-45deg); opacity:0; }
+  70% { transform:scale(1.2) rotate(5deg); opacity:1; }
+  100%{ transform:scale(1) rotate(0deg);  opacity:1; }
+}
+
+/* [UPGRADE] Marker fade-out (before removal) */
+@keyframes marker-remove {
+  0%  { opacity:1; transform:scale(1); }
+  100%{ opacity:0; transform:scale(0); }
+}
+
+/* ── MISC ─────────────────────────────────────────────── */
+/* [UPGRADE] Smooth scroll */
+* { scroll-behavior:smooth; }
+
+/* [UPGRADE] Selection color */
+::selection { background:rgba(59,130,246,0.3); color:var(--text-primary); }

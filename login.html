@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Authority Login — Disaster Alert</title>
+  <meta name="description" content="Secure login portal for disaster alert system authority operators.">
+  <link rel="stylesheet" href="style.css">
+
+  <style>
+    /* ── LOGIN-PAGE-ONLY STYLES ─────────────────────────────── */
+
+    /* Allow scroll on login page */
+    html,
+    body {
+      overflow: auto;
+    }
+
+    /* [UPGRADE] Animated grid background inherited from .center::before in style.css */
+
+    /* [UPGRADE] Floating particles behind card */
+    .particle {
+      position: absolute;
+      border-radius: 50%;
+      background: rgba(59, 130, 246, 0.15);
+      animation: float-particle linear infinite;
+      pointer-events: none;
+    }
+
+    @keyframes float-particle {
+      0% {
+        transform: translateY(0) scale(1);
+        opacity: .7;
+      }
+
+      50% {
+        transform: translateY(-40px) scale(1.1);
+        opacity: .3;
+      }
+
+      100% {
+        transform: translateY(0) scale(1);
+        opacity: .7;
+      }
+    }
+
+    /* [UPGRADE] Scanline separator between heading and inputs */
+    .card-divider {
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--border-bright), transparent);
+      margin: 2px 0 4px 0;
+    }
+
+    /* [UPGRADE] Input wrapper with floating label feel */
+    .input-group {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .input-group label {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-dim);
+    }
+
+    .input-group input {
+      width: 100%;
+      padding: 10px 12px;
+      background: rgba(15, 23, 42, 0.7);
+      border: 1px solid var(--border);
+      border-radius: var(--r-sm);
+      color: var(--text-primary);
+      font-size: 14px;
+      font-family: 'Inter', sans-serif;
+      transition: border-color var(--dur-base), box-shadow var(--dur-base);
+    }
+
+    .input-group input:focus {
+      outline: none;
+      border-color: var(--blue);
+      box-shadow: 0 0 0 3px var(--blue-glow);
+    }
+
+    /* [UPGRADE] Loader spinner */
+    .loader {
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(255, 255, 255, 0.2);
+      border-top: 2px solid white;
+      border-radius: 50%;
+      display: inline-block;
+      animation: spin .7s linear infinite;
+      vertical-align: middle;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    /* [UPGRADE] Login button — full-width accent */
+    #loginBtn {
+      width: 100%;
+      padding: 12px;
+      font-size: 14px;
+      letter-spacing: .5px;
+      background: linear-gradient(135deg, #2563eb, #1d4ed8);
+      position: relative;
+      overflow: hidden;
+    }
+
+    #loginBtn::after {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -60%;
+      width: 60%;
+      height: 200%;
+      background: rgba(255, 255, 255, 0.06);
+      transform: skewX(-20deg);
+      transition: left .5s;
+    }
+
+    #loginBtn:hover::after {
+      left: 110%;
+    }
+
+    #loginBtn:hover {
+      background: linear-gradient(135deg, #3b82f6, #2563eb);
+      box-shadow: 0 0 24px var(--blue-glow);
+    }
+
+    #loginBtn:disabled {
+      opacity: .7;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    /* [UPGRADE] Status text area */
+    #status {
+      text-align: center;
+      font-size: 13px;
+      min-height: 18px;
+      font-weight: 500;
+      transition: color .2s;
+    }
+
+    /* [UPGRADE] Back link */
+    .back-link {
+      text-align: center;
+      font-size: 12px;
+      color: var(--text-dim);
+    }
+
+    .back-link a {
+      color: var(--blue);
+      text-decoration: none;
+      font-weight: 500;
+      transition: color var(--dur-fast);
+    }
+
+    .back-link a:hover {
+      color: #60a5fa;
+    }
+
+    /* [UPGRADE] Shield icon above title */
+    .login-icon {
+      text-align: center;
+      font-size: 36px;
+      margin-bottom: -6px;
+      animation: icon-glow 3s ease-in-out infinite;
+    }
+
+    @keyframes icon-glow {
+
+      0%,
+      100% {
+        filter: drop-shadow(0 0 4px rgba(59, 130, 246, 0.4));
+      }
+
+      50% {
+        filter: drop-shadow(0 0 14px rgba(59, 130, 246, 0.8));
+      }
+    }
+  </style>
+
+</head>
+
+<body class="center">
+
+  <!-- [UPGRADE] Floating background particles -->
+  <div class="particle" style="width:180px;height:180px;top:10%;left:5%;animation-duration:12s;animation-delay:0s;">
+  </div>
+  <div class="particle" style="width:100px;height:100px;top:60%;left:80%;animation-duration:9s;animation-delay:2s;">
+  </div>
+  <div class="particle" style="width:60px;height:60px;top:30%;left:70%;animation-duration:7s;animation-delay:1s;"></div>
+  <div class="particle" style="width:140px;height:140px;bottom:10%;left:15%;animation-duration:11s;animation-delay:3s;">
+  </div>
+
+  <!-- ========================================================
+     LOGIN CARD
+     ======================================================== -->
+  <div class="card">
+
+    <!-- [UPGRADE] Animated shield icon -->
+    <div class="login-icon">🛡️</div>
+
+    <h2>Authority Login</h2>
+    <p class="card-sub">Disaster Alert — Secure Control Portal</p>
+
+    <div class="card-divider"></div>
+
+    <!-- [UPGRADE] Labelled input groups -->
+    <div class="input-group">
+      <label for="email">Email Address</label>
+      <input id="email" type="email" placeholder="authority@agency.gov" autocomplete="username">
+    </div>
+
+    <div class="input-group">
+      <label for="pass">Password</label>
+      <input id="pass" type="password" placeholder="••••••••" autocomplete="current-password">
+    </div>
+
+    <button id="loginBtn" onclick="login()">Login</button>
+
+    <div id="status"></div>
+
+    <div class="back-link">
+      <a href="index.html">← Back to Public Dashboard</a>
+    </div>
+
+  </div>
+
+  <script type="module">
+    import { app } from "./src/config/firebase.js";
+    import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+    const auth = getAuth(app);
+
+    /* ── LOGIN FUNCTION ─────────────────────────────────────── */
+    window.login = async () => {
+      const btn = document.getElementById("loginBtn");
+      const status = document.getElementById("status");
+
+      const email = document.getElementById("email").value.trim();
+      const pass = document.getElementById("pass").value.trim();
+
+      if (!email || !pass) {
+        status.innerText = "⚠ Enter email & password";
+        status.style.color = "var(--moderate)";
+        return;
+      }
+
+      btn.disabled = true;
+      /* [UPGRADE] Spinner inside button */
+      btn.innerHTML = '<span class="loader"></span>&nbsp; Verifying...';
+      status.innerText = "Authenticating...";
+      status.style.color = "var(--blue)";
+
+      try {
+        await signInWithEmailAndPassword(auth, email, pass);
+
+        status.innerText = "✔ Access granted — redirecting";
+        status.style.color = "var(--low)";
+        btn.innerHTML = "✔ Success";
+        btn.style.background = "linear-gradient(135deg,#16a34a,#15803d)";
+
+        setTimeout(() => location = "admin.html", 700);
+
+      } catch (e) {
+
+        let msg = "Authentication failed";
+        if (e.code === "auth/invalid-email") msg = "⚠ Invalid email format";
+        else if (e.code === "auth/user-not-found") msg = "⚠ No account found";
+        else if (e.code === "auth/wrong-password") msg = "⚠ Incorrect password";
+        else if (e.code === "auth/invalid-credential") msg = "⚠ Invalid credentials";
+        else if (e.code === "auth/too-many-requests") msg = "⚠ Too many attempts — wait";
+        else if (e.code === "auth/network-request-failed") msg = "⚠ No internet connection";
+
+        status.innerText = msg;
+        status.style.color = "var(--critical)";
+        btn.disabled = false;
+        btn.innerHTML = "Login";
+        btn.style.background = "";
+
+        /* [UPGRADE] Shake the card on error */
+        const card = document.querySelector(".card");
+        card.style.animation = "none";
+        void card.offsetWidth;
+        card.style.animation = "screen-shake .4s ease";
+        setTimeout(() => card.style.animation = "", 450);
+      }
+    };
+
+    /* ENTER KEY ─────────────────────────────────────────────── */
+    window.addEventListener("keydown", e => {
+      if (e.key === "Enter") login();
+    });
+  </script>
+</body>
+
+</html>

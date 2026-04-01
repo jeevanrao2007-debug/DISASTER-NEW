@@ -3,8 +3,7 @@ server/node_modules/
 serviceAccountKey.json
 .env
 .DS_Store
+
+# Extra safety
+*.json.bak
 server/serviceAccountKey.json
-*.log
-dist/
-build/
-.vscode/

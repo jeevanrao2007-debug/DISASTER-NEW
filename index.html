@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Disaster Alert — Live Operations</title>
+<meta name="description" content="Real-time public disaster monitoring dashboard with live map alerts.">
+
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+<style>
+/* ── INDEX-PAGE-ONLY OVERRIDES ── */
+body { overflow:hidden; }
+
+#activityPanel {
+  bottom:24px;
+  left:16px;
+}
+
+/* ── SOUND ENABLE BANNER ── */
+#soundBanner {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 9999;
+  background: linear-gradient(90deg, #1e293b, #0f172a);
+  border-bottom: 2px solid #f59e0b;
+  color: #fef3c7;
+  text-align: center;
+  padding: 10px 16px;
+  font-family: 'Inter', sans-serif;
+  font-size: 14px; font-weight: 600;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  transition: opacity 0.4s, transform 0.4s;
+  animation: banner-pulse 2s ease-in-out infinite;
+}
+#soundBanner.hidden { opacity:0; pointer-events:none; transform:translateY(-100%); }
+#soundBanner .sb-icon { font-size:20px; animation:bell-shake 1.2s ease-in-out infinite; }
+@keyframes banner-pulse {
+  0%,100% { box-shadow: 0 2px 12px rgba(245,158,11,0.3); }
+  50%     { box-shadow: 0 2px 24px rgba(245,158,11,0.7); }
+}
+@keyframes bell-shake {
+  0%,100% { transform:rotate(0deg); }
+  20%     { transform:rotate(-18deg); }
+  40%     { transform:rotate(18deg); }
+  60%     { transform:rotate(-10deg); }
+  80%     { transform:rotate(10deg); }
+}
+
+/* ── SUBSCRIBE BUTTON ─────────────────────────────────── */
+#subscribeBtn {
+  background: linear-gradient(135deg, rgba(59,130,246,0.18), rgba(99,102,241,0.18));
+  border: 1px solid rgba(99,102,241,0.45);
+  color: #a5b4fc;
+  font-family: 'Inter', sans-serif;
+  font-size: 12px; font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+  letter-spacing: 0.4px;
+}
+#subscribeBtn:hover {
+  background: linear-gradient(135deg, rgba(59,130,246,0.35), rgba(99,102,241,0.35));
+  border-color: rgba(99,102,241,0.7);
+  color: #c7d2fe;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(99,102,241,0.25);
+}
+#subscribeBtn.subscribed {
+  background: linear-gradient(135deg, rgba(34,197,94,0.18), rgba(16,185,129,0.18));
+  border-color: rgba(34,197,94,0.4);
+  color: #86efac;
+}
+
+/* ── SUBSCRIBE MODAL ──────────────────────────────────── */
+#subModalOverlay {
+  position: fixed; inset:0;
+  background: rgba(2,6,23,0.8);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  z-index: 10000;
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.25s;
+}
+#subModalOverlay.open { opacity:1; pointer-events:all; }
+
+#subModal {
+  background: linear-gradient(145deg, #1e293b, #0f172a);
+  border: 1px solid rgba(99,102,241,0.35);
+  border-radius: 18px;
+  padding: 36px 32px;
+  width: min(440px, 92vw);
+  box-shadow: 0 30px 80px rgba(0,0,0,0.6), 0 0 40px rgba(99,102,241,0.12);
+  transform: translateY(20px) scale(0.97);
+  transition: transform 0.3s cubic-bezier(.34,1.56,.64,1);
+  position: relative;
+}
+#subModalOverlay.open #subModal { transform: translateY(0) scale(1); }
+
+#subModal .modal-close {
+  position:absolute; top:14px; right:16px;
+  background:none; border:none;
+  color: #64748b; font-size:20px; cursor:pointer;
+  padding:4px 8px; border-radius:6px;
+  transition: color 0.2s;
+}
+#subModal .modal-close:hover { color:#e2e8f0; }
+
+#subModal .modal-icon { font-size:40px; text-align:center; margin-bottom:12px; }
+#subModal h2 {
+  margin:0 0 6px;
+  font-size:20px; font-weight:700;
+  color:#f1f5f9; text-align:center;
+}
+#subModal p {
+  margin:0 0 22px;
+  font-size:13px; color:#94a3b8; text-align:center; line-height:1.6;
+}
+#subModal label {
+  display:block; font-size:12px; font-weight:600;
+  color:#cbd5e1; margin-bottom:7px; letter-spacing:0.5px;
+}
+#subModal input[type=email] {
+  width:100%; box-sizing:border-box;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(99,102,241,0.35);
+  border-radius: 10px; color:#f1f5f9;
+  font-size:14px; padding:11px 14px;
+  margin-bottom:18px;
+  outline:none; transition: border-color 0.2s, box-shadow 0.2s;
+}
+#subModal input[type=email]:focus {
+  border-color: rgba(99,102,241,0.7);
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.15);
+}
+#subModal input[type=email]::placeholder { color:#475569; }
+
+#subModal .modal-hint {
+  font-size:11px; color:#475569;
+  margin-bottom:20px; line-height:1.5;
+}
+#subModal .sub-submit-btn {
+  width:100%;
+  background: linear-gradient(135deg, #4f46e5, #6366f1);
+  border:none; border-radius:10px;
+  color:#fff; font-size:14px; font-weight:600;
+  padding:13px; cursor:pointer;
+  transition: all 0.2s;
+  letter-spacing:0.3px;
+}
+#subModal .sub-submit-btn:hover:not(:disabled) {
+  transform:translateY(-2px);
+  box-shadow: 0 8px 24px rgba(79,70,229,0.4);
+}
+#subModal .sub-submit-btn:disabled {
+  opacity:0.65; cursor:not-allowed;
+}
+#subModal .sub-result {
+  margin-top:14px; font-size:13px; text-align:center;
+  min-height:20px; border-radius:8px; padding:8px;
+}
+#subModal .sub-result.success {
+  background:rgba(34,197,94,0.12); color:#86efac;
+  border:1px solid rgba(34,197,94,0.25);
+}
+#subModal .sub-result.error {
+  background:rgba(239,68,68,0.12); color:#fca5a5;
+  border:1px solid rgba(239,68,68,0.25);
+}
+</style>
+</head>
+
+<body>
+
+<!-- ========================================================
+     TOP BAR
+     ======================================================== -->
+<div class="topbar">
+
+  <div class="topbar-brand">
+    <!-- [UPGRADE] Heartbeat dot -->
+    <div class="heartbeat-dot" id="heartbeatDot" title="System connected"></div>
+    🌍 Public Disaster Monitoring
+  </div>
+
+  <div class="topbar-right">
+    <div class="sys-status" id="sysStatus">LIVE · 0 ALERTS</div>
+
+    <div id="alarmIndicator">
+      <div class="ai-blink"></div>
+      CRITICAL ALERT
+    </div>
+
+    <!-- Subscribe to Alerts button -->
+    <button id="subscribeBtn" onclick="window.openSubscribeModal()">🔔 Subscribe</button>
+
+    <a href="login.html">Authority Login</a>
+  </div>
+</div>
+
+<!-- ========================================================
+     MAP
+     ======================================================== -->
+<div id="map" style="height:100vh;"></div>
+
+<!-- ========================================================
+     MAP LEGEND
+     ======================================================== -->
+<div class="legend">
+  <b>Severity</b>
+  <div><span class="l-low"></span>Low</div>
+  <div><span class="l-moderate"></span>Moderate</div>
+  <div><span class="l-high"></span>High</div>
+  <div><span class="l-critical"></span>Critical</div>
+</div>
+
+<!-- ========================================================
+     [UPGRADE] ACTIVITY STREAM PANEL
+     ======================================================== -->
+<div id="activityPanel">
+  <h4>⚡ Live Activity</h4>
+  <ul id="activityList">
+    <li class="activity-item">
+      <div class="ai-dot"></div>
+      <span>System online — awaiting alerts</span>
+      <span class="ai-time">now</span>
+    </li>
+  </ul>
+</div>
+
+<!-- ========================================================
+     SOUND ENABLE BANNER (shown until user interacts)
+     ======================================================== -->
+<div id="soundBanner" title="Click anywhere to enable alarm sound">
+  <span class="sb-icon">🔔</span>
+  <span>Click here to enable alarm sound — you will hear alerts for critical disasters</span>
+  <span style="opacity:0.6;font-size:12px;margin-left:8px;">(Required by browser)</span>
+</div>
+
+<!-- ========================================================
+     [UPGRADE] TOAST CONTAINER
+     ======================================================== -->
+<div id="toastContainer"></div>
+
+<!-- ========================================================
+     [UPGRADE] CRITICAL FLASH OVERLAY
+     ======================================================== -->
+<div id="criticalFlash"></div>
+
+<!-- ========================================================
+     PHASE 2: SUBSCRIBE MODAL
+     ======================================================== -->
+<div id="subModalOverlay" role="dialog" aria-modal="true" aria-labelledby="subModalTitle">
+  <div id="subModal">
+    <button class="modal-close" onclick="window.closeSubscribeModal()" aria-label="Close">×</button>
+    <div class="modal-icon">🔔</div>
+    <h2 id="subModalTitle">Subscribe to Alerts</h2>
+    <p>Receive instant push notifications and email alerts when disasters are detected near you.</p>
+
+    <label for="subEmail">Email Address <span style="color:#64748b;font-weight:400;">(optional)</span></label>
+    <input type="email" id="subEmail" placeholder="your@email.com" autocomplete="email">
+
+    <p class="modal-hint">📍 Your browser location may be requested to send only nearby alerts.<br>
+    🔔 Push notifications require browser permission.</p>
+
+    <button class="sub-submit-btn" id="subSubmitBtn" onclick="window.handleSubscribe()">Enable Notifications</button>
+    <div class="sub-result" id="subResult"></div>
+  </div>
+</div>
+
+<!-- ========================================================
+     MAIN APP MODULE
+     ======================================================== -->
+<script type="module" src="src/index.js"></script>
+
+<!-- ========================================================
+     PUSH NOTIFICATION MODULE
+     ======================================================== -->
+<script type="module" src="messaging.js"></script>
+
+</body>
+</html>
