@@ -1,8 +1,0 @@
-node_modules/
-server/node_modules/
-serviceAccountKey.json
-.env
-.DS_Store
-server/
-*.json.bak
-server/serviceAccountKey.json
