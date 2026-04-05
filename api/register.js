@@ -10,6 +10,7 @@
    This replaces the old in-memory array in server.js.
    ========================================================= */
 
+import { createHash } from "node:crypto";
 import { getAdminDb } from "./_firebaseAdmin.js";
 
 // CORS headers shared with all API routes
@@ -34,8 +35,8 @@ export default async function handler(req, res) {
   try {
     const db = getAdminDb();
 
-    // Use a stable, safe key derived from the token (truncated base64)
-    const tokenKey = Buffer.from(token).toString("base64url").slice(0, 28);
+    // Hash the full token so each device record gets a collision-safe key.
+    const tokenKey = createHash("sha256").update(token).digest("hex");
 
     // Persist the token record
     await db.ref(`fcm_tokens/${tokenKey}`).set({

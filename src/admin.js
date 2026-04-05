@@ -32,15 +32,20 @@ const pubStatusText = document.getElementById("status");
 const pendingBadge = document.getElementById("pendingCount");
 const pendingBox = document.getElementById("pendingBox");
 
+let isInitialized = false;
+
 /* ── AUTH GUARD ───────────────────────────────────────── */
 onAuthStateChanged(auth, user => {
-  if (!user) { location = "login.html"; return; }
+  if (!user) { window.location.href = "login.html"; return; }
   document.body.style.display = "block";
   logActivity(`Authenticated as ${user.email || "admin"}`, "green");
-  setupInit();
+  if (!isInitialized) {
+    setupInit();
+    isInitialized = true;
+  }
 });
 
-window.logout = () => signOut(auth).then(() => location = "login.html");
+window.logout = () => signOut(auth).then(() => window.location.href = "login.html");
 
 /* ── ACTIVITY LOG ─────────────────────────────────────── */
 function logActivity(text, dotClass = "") {

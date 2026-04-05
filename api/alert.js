@@ -34,6 +34,17 @@ function setCors(res) {
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 }
 
+/* ---- Sanitization ---------------------------------------- */
+function sanitizeHTML(str) {
+  if (!str) return "";
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 /* ---- Haversine ------------------------------------------- */
 function haversineKm(lat1, lng1, lat2, lng2) {
   const R = 6371; // Earth radius in km
@@ -161,6 +172,10 @@ async function sendFCMMulticast({ title, body, severity, type, lat, lng }) {
 const HIGH_OR_CRITICAL = new Set(["high", "critical"]);
 
 function buildEmailHtml({ type, severity, description, lat, lng }) {
+  const sType = sanitizeHTML(type);
+  const sSeverity = sanitizeHTML(severity);
+  const sDescription = sanitizeHTML(description);
+
   const sevColor = severity === "critical" ? "#ef4444" : "#fb923c";
   const latNum = toFiniteNumber(lat);
   const lngNum = toFiniteNumber(lng);
@@ -190,15 +205,15 @@ function buildEmailHtml({ type, severity, description, lat, lng }) {
     <table style="width:100%;border-collapse:collapse;">
       <tr>
         <td style="padding:8px 12px;color:#94a3b8;font-size:13px;width:110px;">Type</td>
-        <td style="padding:8px 12px;font-weight:700;color:#f1f5f9;font-size:15px;">${type}</td>
+        <td style="padding:8px 12px;font-weight:700;color:#f1f5f9;font-size:15px;">${sType}</td>
       </tr>
       <tr style="background:rgba(255,255,255,0.03);">
         <td style="padding:8px 12px;color:#94a3b8;font-size:13px;">Severity</td>
-        <td style="padding:8px 12px;font-weight:700;color:${sevColor};font-size:15px;letter-spacing:1px;">${(severity || "").toUpperCase()}</td>
+        <td style="padding:8px 12px;font-weight:700;color:${sevColor};font-size:15px;letter-spacing:1px;">${(sSeverity || "").toUpperCase()}</td>
       </tr>
-      ${description ? `<tr>
+      ${sDescription ? `<tr>
         <td style="padding:8px 12px;color:#94a3b8;font-size:13px;">Details</td>
-        <td style="padding:8px 12px;color:#cbd5e1;">${description}</td>
+        <td style="padding:8px 12px;color:#cbd5e1;">${sDescription}</td>
       </tr>` : ""}
       ${locationRow}
     </table>

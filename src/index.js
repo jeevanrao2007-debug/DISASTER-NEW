@@ -78,7 +78,8 @@ listenForAlerts((data) => {
       const isHigh = severity.toLowerCase() === "high";
       const dotColor = isCritical ? "red" : isHigh ? "yellow" : "green";
       
-      addActivity(`${a.type} alert — <b>${severity}</b>`, dotColor);
+      const alertType = a.type || "Disaster";
+      addActivity(`${alertType} alert — <b>${severity}</b>`, dotColor);
       showToast(
         `${a.type} Alert`, 
         a.desc || a.description || `Severity: ${severity}`, 

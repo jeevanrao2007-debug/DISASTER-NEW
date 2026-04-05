@@ -3,6 +3,10 @@
 import { getDatabase, ref, set, get, child } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 import { app } from "./src/config/firebase.js";
 
+/* ================= SYSTEM CONSTANTS ================= */
+const TARGET_LAT = 13.08;
+const TARGET_LNG = 80.27;
+
 /* ================= FIREBASE ================= */
 
 const db = getDatabase(app);
@@ -61,10 +65,10 @@ async function detectEarthquake(){
 
 async function detectFlood(){
   try{
-    const res = await fetch("https://api.open-meteo.com/v1/forecast?latitude=13.08&longitude=80.27&hourly=rain");
+    const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${TARGET_LAT}&longitude=${TARGET_LNG}&hourly=rain`);
     const data = await res.json();
 
-    const rain = data?.hourly?.rain ? Math.max(...data.hourly.rain) : 0;
+    const rain = (data?.hourly?.rain && data.hourly.rain.length > 0) ? Math.max(...data.hourly.rain) : 0;
     if(rain < 40) return;
 
     const id="flood_"+Math.floor(Date.now()/3600000);
@@ -78,7 +82,7 @@ async function detectFlood(){
       type:"Flood Risk",
       level,
       desc:`Rainfall intensity ${rain} mm/hr`,
-      lat:13.08,lng:80.27,
+      lat:TARGET_LAT,lng:TARGET_LNG,
       source:"Weather Precipitation Model",
       confidence:Math.min(95,Math.floor(rain)),
       detectedAt:new Date().toLocaleString(),
@@ -96,7 +100,7 @@ async function detectFlood(){
 
 async function detectFire(){
   try{
-    const res = await fetch("https://api.open-meteo.com/v1/forecast?latitude=13.08&longitude=80.27&current_weather=true");
+    const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${TARGET_LAT}&longitude=${TARGET_LNG}&current_weather=true`);
     const data = await res.json();
 
     const temp = data?.current_weather?.temperature ?? 0;
@@ -113,7 +117,7 @@ async function detectFire(){
       type:"Fire Risk",
       level,
       desc:`Surface temperature ${temp}°C`,
-      lat:13.08,lng:80.27,
+      lat:TARGET_LAT,lng:TARGET_LNG,
       source:"Thermal Weather Model",
       confidence:Math.min(96,Math.floor(temp*2)),
       detectedAt:new Date().toLocaleString(),
@@ -131,10 +135,10 @@ async function detectFire(){
 
 async function detectCyclone(){
   try{
-    const res = await fetch("https://api.open-meteo.com/v1/forecast?latitude=13.08&longitude=80.27&hourly=windspeed_10m");
+    const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${TARGET_LAT}&longitude=${TARGET_LNG}&hourly=windspeed_10m`);
     const data = await res.json();
 
-    const wind = data?.hourly?.windspeed_10m ? Math.max(...data.hourly.windspeed_10m) : 0;
+    const wind = (data?.hourly?.windspeed_10m && data.hourly.windspeed_10m.length > 0) ? Math.max(...data.hourly.windspeed_10m) : 0;
     if(wind < 50) return;
 
     const id="wind_"+Math.floor(Date.now()/3600000);
@@ -148,7 +152,7 @@ async function detectCyclone(){
       type:"Cyclone Risk",
       level,
       desc:`Wind speed ${wind} km/h`,
-      lat:13.08,lng:80.27,
+      lat:TARGET_LAT,lng:TARGET_LNG,
       source:"Atmospheric Wind Model",
       confidence:Math.min(98,Math.floor(wind)),
       detectedAt:new Date().toLocaleString(),
@@ -165,10 +169,12 @@ async function detectCyclone(){
 /* ================= MASTER LOOP ================= */
 
 async function run(){
-  detectEarthquake();
-  detectFlood();
-  detectFire();
-  detectCyclone();
+  await Promise.all([
+    detectEarthquake(),
+    detectFlood(),
+    detectFire(),
+    detectCyclone()
+  ]);
 }
 
 /* run every 60 seconds */

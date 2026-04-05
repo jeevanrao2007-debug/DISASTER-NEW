@@ -7,3 +7,4 @@ serviceAccountKey.json
 # Extra safety
 *.json.bak
 server/serviceAccountKey.json
+__startup_check*.log

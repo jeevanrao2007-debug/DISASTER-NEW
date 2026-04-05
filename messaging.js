@@ -12,6 +12,8 @@ import { getMessaging, onMessage }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
 import { app } from "./src/config/firebase.js";
 
+const NOTIFICATION_ICON_URL = "https://cdn-icons-png.flaticon.com/512/564/564619.png";
+
 /* Register service worker (required for background notifications) */
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker
@@ -44,7 +46,7 @@ onMessage(messaging, payload => {
   } else {
     /* Fallback: native browser notification */
     if (Notification.permission === "granted") {
-      new Notification(title, { body, icon: "/icon.png" });
+      new Notification(title, { body, icon: NOTIFICATION_ICON_URL });
     }
   }
 

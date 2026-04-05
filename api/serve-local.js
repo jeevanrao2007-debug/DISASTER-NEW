@@ -15,23 +15,24 @@ app.use(express.json());
 const staticPath = path.join(__dirname, "..");
 app.use(express.static(staticPath));
 
+async function runLocalHandler(modulePath, routeLabel, req, res) {
+  const handler = (await import(modulePath)).default;
+  const shouldLogBody = req.method === "POST" && req.body && Object.keys(req.body).length > 0;
+  console.log(`[Local] -> ${req.method} ${routeLabel}`, shouldLogBody ? req.body : "");
+  return handler(req, res);
+}
+
 // Mock Vercel serverless environment locally
-app.post("/api/register", async (req, res) => {
-  const handler = (await import("./register.js")).default;
-  console.log("[Local] -> POST /api/register");
-  return handler(req, res);
+app.all("/api/register", async (req, res) => {
+  return runLocalHandler("./register.js", "/api/register", req, res);
 });
 
-app.post("/api/alert", async (req, res) => {
-  const handler = (await import("./alert.js")).default;
-  console.log("[Local] -> POST /api/alert", req.body);
-  return handler(req, res);
+app.all("/api/alert", async (req, res) => {
+  return runLocalHandler("./alert.js", "/api/alert", req, res);
 });
 
-app.get("/api/cron", async (req, res) => {
-  const handler = (await import("./cron.js")).default;
-  console.log("[Local] -> GET /api/cron");
-  return handler(req, res);
+app.all("/api/cron", async (req, res) => {
+  return runLocalHandler("./cron.js", "/api/cron", req, res);
 });
 
 const PORT = process.env.PORT || 3000;
