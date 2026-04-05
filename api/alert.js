@@ -6,13 +6,10 @@
 
    Actions:
    1. Reads all FCM tokens from Firebase RTDB
-   2. Filters tokens by distance (Haversine, 25km radius)
-      - if user has no location stored, they always get notified
-   3. Sends FCM multicast push to filtered devices
-   4. Reads all subscriber emails from Firebase RTDB
-   5. For HIGH or CRITICAL severity only, sends email alerts
-      - also filtered by 25km if user location is stored
-   6. Cleans up invalid FCM tokens automatically
+   2. Sends FCM multicast push to ALL valid tokens (broadcast mode)
+   3. Reads all subscriber emails from Firebase RTDB
+   4. Sends email alerts for ALL severity levels to ALL subscribers
+   5. Cleans up invalid FCM tokens automatically
 
    Body payload:
    {
@@ -45,24 +42,7 @@ function sanitizeHTML(str) {
     .replace(/'/g, "&#039;");
 }
 
-/* ---- Haversine ------------------------------------------- */
-function haversineKm(lat1, lng1, lat2, lng2) {
-  const R = 6371; // Earth radius in km
-  const toRad = (deg) => (deg * Math.PI) / 180;
-
-  const dLat = toRad(lat2 - lat1);
-  const dLng = toRad(lng2 - lng1);
-
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
-    Math.sin(dLng / 2) * Math.sin(dLng / 2);
-
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-}
-
-const GEOFENCE_RADIUS_KM = 25;
+/* ---- Helpers --------------------------------------------- */
 const NOTIFICATION_ICON_URL = "https://cdn-icons-png.flaticon.com/512/564/564619.png";
 const NOTIFICATION_BADGE_URL = "https://cdn-icons-png.flaticon.com/512/564/564619.png";
 
@@ -75,44 +55,19 @@ function toFiniteNumber(value) {
   return null;
 }
 
-/**
- * Returns true if the user should receive this alert.
- * - If no alert location provided -> always notify (broadcast mode)
- * - If user has no stored location -> always notify (opt-in to all)
- * - If user is within 25km -> notify
- * - Otherwise -> skip
- */
-function isWithinRadius(alertLat, alertLng, userLocation) {
-  const aLat = toFiniteNumber(alertLat);
-  const aLng = toFiniteNumber(alertLng);
-  const uLat = toFiniteNumber(userLocation?.lat);
-  const uLng = toFiniteNumber(userLocation?.lng);
-
-  // Invalid/missing alert location means broadcast mode.
-  if (aLat == null || aLng == null) return true;
-  // Missing user location keeps user opted in.
-  if (uLat == null || uLng == null) return true;
-
-  const dist = haversineKm(aLat, aLng, uLat, uLng);
-  return dist <= GEOFENCE_RADIUS_KM;
-}
-
-/* ---- FCM multicast (geofenced) --------------------------- */
-async function sendFCMMulticast({ title, body, severity, type, lat, lng }) {
+/* ---- FCM multicast --------------------------------------- */
+async function sendFCMMulticast({ title, body, severity, type }) {
   const db = getAdminDb();
   const snap = await db.ref("fcm_tokens").once("value");
   const tokensMap = snap.val() || {};
 
   const entries = Object.entries(tokensMap);
 
-  // Keep token if within radius or no location stored.
-  const filtered = entries.filter(([, v]) => isWithinRadius(lat, lng, v?.location));
-  const validEntries = filtered.filter(([, v]) => Boolean(v?.token));
+  // Broadcast mode: include all tokens that have a valid token string.
+  const validEntries = entries.filter(([, v]) => Boolean(v?.token));
   const tokens = validEntries.map(([, v]) => v.token);
 
-  console.info(
-    `[FCM] Total tokens: ${entries.length} | In radius: ${filtered.length} | Skipped: ${entries.length - filtered.length}`
-  );
+  console.info(`[FCM] Broadcasting to all subscribers. Total: ${entries.length} | Valid tokens: ${tokens.length}`);
 
   if (tokens.length === 0) {
     return { sent: 0, failed: 0, skipped: "no_tokens_in_radius" };
@@ -156,49 +111,41 @@ async function sendFCMMulticast({ title, body, severity, type, lat, lng }) {
     invalidKeys.forEach((k) => {
       updates[`fcm_tokens/${k}`] = null;
     });
-    db.ref().update(updates).catch(console.error);
+    db.ref().update(updates).catch((e) => console.error("[FCM] Cleanup error:", e));
   }
 
   return {
     sent: response.successCount,
     failed: response.failureCount,
     cleaned: invalidKeys.length,
-    total: entries.length,
-    inRadius: filtered.length
+    total: entries.length
   };
 }
 
-/* ---- Email service (geofenced) --------------------------- */
-const HIGH_OR_CRITICAL = new Set(["high", "critical"]);
-
-function buildEmailHtml({ type, severity, description, lat, lng }) {
+/* ---- Email service -------------------------------------- */
+function buildEmailHtml({ type, severity, description }) {
   const sType = sanitizeHTML(type);
   const sSeverity = sanitizeHTML(severity);
   const sDescription = sanitizeHTML(description);
 
-  const sevColor = severity === "critical" ? "#ef4444" : "#fb923c";
-  const latNum = toFiniteNumber(lat);
-  const lngNum = toFiniteNumber(lng);
-
-  const locationRow =
-    latNum != null && lngNum != null
-      ? `<tr>
-          <td style="padding:8px 12px;color:#94a3b8;font-size:13px;">Location</td>
-          <td style="padding:8px 12px;color:#f1f5f9;">
-            Lat: ${latNum.toFixed(4)}, Lng: ${lngNum.toFixed(4)}
-          </td>
-        </tr>`
-      : "";
+  // Map severity levels to brand colors.
+  const sevMap = {
+    critical: "#ef4444", // Red
+    high: "#f97316",     // Orange
+    moderate: "#f59e0b", // Yellow/Amber
+    low: "#22c55e"       // Green
+  };
+  const sevColor = sevMap[sSeverity.toLowerCase()] || "#fb923c";
 
   return `<!DOCTYPE html>
 <html>
 <body style="margin:0;padding:20px;background:#0f172a;">
-<div style="font-family:'Segoe UI',Arial,sans-serif;max-width:600px;margin:0 auto;background:#1e293b;color:#e2e8f0;border-radius:14px;overflow:hidden;border:1px solid rgba(239,68,68,0.3);">
+<div style="font-family:'Segoe UI',Arial,sans-serif;max-width:600px;margin:0 auto;background:#1e293b;color:#e2e8f0;border-radius:14px;overflow:hidden;border:1px solid rgba(255,255,255,0.1);">
 
-  <div style="background:linear-gradient(135deg,#991b1b,#7f1d1d);padding:28px 24px;text-align:center;">
-    <div style="font-size:36px;margin-bottom:8px;">[ALERT]</div>
+  <div style="background:linear-gradient(135deg,#1e293b,#0f172a);padding:28px 24px;text-align:center;border-bottom:1px solid rgba(255,255,255,0.05);">
+    <div style="font-size:36px;margin-bottom:8px;">🔔</div>
     <h1 style="margin:0;font-size:22px;font-weight:700;color:#fff;letter-spacing:1px;">DISASTER ALERT</h1>
-    <div style="margin-top:8px;font-size:13px;color:#fca5a5;">${new Date().toLocaleString()}</div>
+    <div style="margin-top:8px;font-size:13px;color:#94a3b8;">${new Date().toLocaleString()}</div>
   </div>
 
   <div style="padding:24px;">
@@ -215,10 +162,9 @@ function buildEmailHtml({ type, severity, description, lat, lng }) {
         <td style="padding:8px 12px;color:#94a3b8;font-size:13px;">Details</td>
         <td style="padding:8px 12px;color:#cbd5e1;">${sDescription}</td>
       </tr>` : ""}
-      ${locationRow}
     </table>
 
-    <div style="margin-top:20px;padding:14px 16px;background:rgba(239,68,68,0.08);border-radius:8px;border-left:3px solid #ef4444;">
+    <div style="margin-top:20px;padding:14px 16px;background:rgba(239,68,68,0.08);border-radius:8px;border-left:3px solid ${sevColor};">
       <p style="margin:0;font-size:13px;color:#fca5a5;line-height:1.6;">
         WARNING: <strong>Stay safe.</strong> Follow all official emergency broadcasts.
         Do not enter affected areas. Move to higher ground if advised.
@@ -227,7 +173,7 @@ function buildEmailHtml({ type, severity, description, lat, lng }) {
 
     <p style="margin-top:20px;font-size:11px;color:#475569;text-align:center;">
       You received this alert because you subscribed to Disaster Alert notifications.<br>
-      <small style="color:#334155">Alerts are filtered to your area (${GEOFENCE_RADIUS_KM}km radius).</small>
+      <small style="color:#334155">This is a broadcast notification sent to all subscribers.</small>
     </p>
   </div>
 </div>
@@ -235,11 +181,7 @@ function buildEmailHtml({ type, severity, description, lat, lng }) {
 </html>`;
 }
 
-async function sendEmailAlerts({ type, severity, description, lat, lng }) {
-  if (!HIGH_OR_CRITICAL.has(severity?.toLowerCase())) {
-    return { skipped: true, reason: "severity_below_high" };
-  }
-
+async function sendEmailAlerts({ type, severity, description }) {
   const gmailUser = process.env.GMAIL_USER;
   const gmailPass = process.env.GMAIL_APP_PASSWORD;
 
@@ -260,13 +202,13 @@ async function sendEmailAlerts({ type, severity, description, lat, lng }) {
   const recipients = [];
 
   Object.values(tokensMap).forEach((v) => {
-    if (v?.email && v.email.includes("@") && isWithinRadius(lat, lng, v.location)) {
+    if (v?.email && v.email.includes("@")) {
       recipients.push(v.email.toLowerCase());
     }
   });
 
   Object.values(emailSubs).forEach((v) => {
-    if (v?.email && v.email.includes("@") && isWithinRadius(lat, lng, v.location)) {
+    if (v?.email && v.email.includes("@")) {
       recipients.push(v.email.toLowerCase());
     }
   });
@@ -278,8 +220,8 @@ async function sendEmailAlerts({ type, severity, description, lat, lng }) {
   );
 
   if (emails.length === 0) {
-    console.info("[email-diag] No matching subscribers found for this location/severity.");
-    return { sent: 0, reason: "no_subscribers_in_radius" };
+    console.info("[email-diag] No subscribers found.");
+    return { sent: 0, reason: "no_subscribers" };
   }
 
   const transporter = nodemailer.createTransport({
@@ -288,7 +230,7 @@ async function sendEmailAlerts({ type, severity, description, lat, lng }) {
   });
 
   const subject = `[ALERT] ${(severity || "").toUpperCase()} ALERT: ${type} Detected`;
-  const html = buildEmailHtml({ type, severity, description, lat, lng });
+  const html = buildEmailHtml({ type, severity, description });
 
   const results = await Promise.allSettled(
     emails.map((to) =>
@@ -323,22 +265,50 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
+  // 1. API Key Validation
   const apiKey = req.headers["x-api-key"] || req.headers["authorization"]?.replace("Bearer ", "");
-  const expectedKey = process.env.ALERT_API_KEY || "default_dev_key";
+  const expectedKey = process.env.ALERT_API_KEY;
+
+  if (!expectedKey) {
+    console.error("[api/alert] ALERT_API_KEY is not defined in environment variables.");
+    return res.status(500).json({ error: "API configuration error" });
+  }
+
   if (apiKey !== expectedKey) {
     return res.status(401).json({ error: "Unauthorized" });
   }
 
-  const {
-    type = "Unknown",
-    severity = "low",
-    description = "",
-    lat,
-    lng
-  } = req.body ?? {};
-
   try {
-    const normSev = String(severity || "low").toLowerCase();
+    // 2. JSON Body Parsing check (handle cases where req.body is not automatically parsed)
+    let body = req.body;
+    if (typeof body === "string") {
+      try {
+        body = JSON.parse(body);
+      } catch (e) {
+        return res.status(400).json({ error: "Invalid JSON body" });
+      }
+    }
+
+    const {
+      type = "Emergency",
+      severity = "moderate",
+      description = "",
+      lat,
+      lng
+    } = body ?? {};
+
+    // 3. Basic Request Validation
+    if (!type || typeof type !== "string") {
+      return res.status(400).json({ error: "Missing or invalid alert type" });
+    }
+
+    const normSev = String(severity || "moderate").toLowerCase();
+    const VALID_SEVERITIES = new Set(["low", "moderate", "high", "critical"]);
+    
+    if (!VALID_SEVERITIES.has(normSev)) {
+      return res.status(400).json({ error: `Invalid severity level: ${severity}` });
+    }
+
     const displayLevel = normSev.charAt(0).toUpperCase() + normSev.slice(1);
     const alertLat = toFiniteNumber(lat);
     const alertLng = toFiniteNumber(lng);
@@ -348,16 +318,12 @@ export default async function handler(req, res) {
         title: `${type} - ${displayLevel.toUpperCase()}`,
         body: description || "Emergency nearby. Stay safe.",
         severity: normSev,
-        type,
-        lat: alertLat,
-        lng: alertLng
+        type
       }),
       sendEmailAlerts({
         type,
         severity: normSev,
-        description,
-        lat: alertLat,
-        lng: alertLng
+        description
       })
     ]);
 

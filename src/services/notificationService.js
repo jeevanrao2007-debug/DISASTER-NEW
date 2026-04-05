@@ -128,9 +128,7 @@ export async function triggerNotification(alert) {
       body: JSON.stringify({
         type:        alert.type        || "Alert",
         severity:    alert.severity    || alert.level || "low",
-        description: alert.description || alert.desc  || "",
-        lat:         alert.lat,
-        lng:         alert.lng
+        description: alert.description || alert.desc  || ""
       })
     });
 
