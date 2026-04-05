@@ -1,5 +1,5 @@
 /* =========================================================
-   api/alert.js — POST /api/alert
+   api/alert.js - POST /api/alert
    Vercel Serverless Function
 
    Triggered when an alert is published or approved.
@@ -7,11 +7,11 @@
    Actions:
    1. Reads all FCM tokens from Firebase RTDB
    2. Filters tokens by distance (Haversine, 25km radius)
-      — if user has no location stored, they always get notified
+      - if user has no location stored, they always get notified
    3. Sends FCM multicast push to filtered devices
    4. Reads all subscriber emails from Firebase RTDB
    5. For HIGH or CRITICAL severity only, sends email alerts
-      — also filtered by 25km if user location is stored
+      - also filtered by 25km if user location is stored
    6. Cleans up invalid FCM tokens automatically
 
    Body payload:
@@ -27,20 +27,17 @@
 import nodemailer from "nodemailer";
 import { getAdminDb, getAdminMessaging } from "./_firebaseAdmin.js";
 
-/* ── CORS ──────────────────────────────────────────────── */
+/* ---- CORS ------------------------------------------------ */
 function setCors(res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 }
 
-/* ── HAVERSINE FORMULA ─────────────────────────────────── */
-/**
- * Calculates the distance in km between two lat/lng points.
- */
+/* ---- Haversine ------------------------------------------- */
 function haversineKm(lat1, lng1, lat2, lng2) {
   const R = 6371; // Earth radius in km
-  const toRad = deg => (deg * Math.PI) / 180;
+  const toRad = (deg) => (deg * Math.PI) / 180;
 
   const dLat = toRad(lat2 - lat1);
   const dLng = toRad(lng2 - lng1);
@@ -55,29 +52,41 @@ function haversineKm(lat1, lng1, lat2, lng2) {
 }
 
 const GEOFENCE_RADIUS_KM = 25;
+const NOTIFICATION_ICON_URL = "https://cdn-icons-png.flaticon.com/512/564/564619.png";
+const NOTIFICATION_BADGE_URL = "https://cdn-icons-png.flaticon.com/512/564/564619.png";
+
+function toFiniteNumber(value) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim() !== "") {
+    const n = Number(value);
+    if (Number.isFinite(n)) return n;
+  }
+  return null;
+}
 
 /**
  * Returns true if the user should receive this alert.
- * - If no alert location provided → always notify (broadcast mode)
- * - If user has no stored location → always notify (opt-in to all)
- * - If user is within 25km → notify
- * - Otherwise → skip
+ * - If no alert location provided -> always notify (broadcast mode)
+ * - If user has no stored location -> always notify (opt-in to all)
+ * - If user is within 25km -> notify
+ * - Otherwise -> skip
  */
 function isWithinRadius(alertLat, alertLng, userLocation) {
-  if (alertLat == null || alertLng == null) return true;
-  if (!userLocation?.lat || !userLocation?.lng) return true;
+  const aLat = toFiniteNumber(alertLat);
+  const aLng = toFiniteNumber(alertLng);
+  const uLat = toFiniteNumber(userLocation?.lat);
+  const uLng = toFiniteNumber(userLocation?.lng);
 
-  const dist = haversineKm(
-    parseFloat(alertLat),
-    parseFloat(alertLng),
-    parseFloat(userLocation.lat),
-    parseFloat(userLocation.lng)
-  );
+  // Invalid/missing alert location means broadcast mode.
+  if (aLat == null || aLng == null) return true;
+  // Missing user location keeps user opted in.
+  if (uLat == null || uLng == null) return true;
 
+  const dist = haversineKm(aLat, aLng, uLat, uLng);
   return dist <= GEOFENCE_RADIUS_KM;
 }
 
-/* ── FCM MULTICAST (geofenced) ─────────────────────────── */
+/* ---- FCM multicast (geofenced) --------------------------- */
 async function sendFCMMulticast({ title, body, severity, type, lat, lng }) {
   const db = getAdminDb();
   const snap = await db.ref("fcm_tokens").once("value");
@@ -85,12 +94,10 @@ async function sendFCMMulticast({ title, body, severity, type, lat, lng }) {
 
   const entries = Object.entries(tokensMap);
 
-  // Filter by geofence — keep token if within radius or no location stored
-  const filtered = entries.filter(([, v]) =>
-    isWithinRadius(lat, lng, v.location)
-  );
-
-  const tokens = filtered.map(([, v]) => v.token).filter(Boolean);
+  // Keep token if within radius or no location stored.
+  const filtered = entries.filter(([, v]) => isWithinRadius(lat, lng, v?.location));
+  const validEntries = filtered.filter(([, v]) => Boolean(v?.token));
+  const tokens = validEntries.map(([, v]) => v.token);
 
   console.info(
     `[FCM] Total tokens: ${entries.length} | In radius: ${filtered.length} | Skipped: ${entries.length - filtered.length}`
@@ -112,14 +119,14 @@ async function sendFCMMulticast({ title, body, severity, type, lat, lng }) {
     webpush: {
       headers: { Urgency: severity === "critical" ? "high" : "normal" },
       notification: {
-        icon: "/icon-192.png",
-        badge: "/icon-72.png",
+        icon: NOTIFICATION_ICON_URL,
+        badge: NOTIFICATION_BADGE_URL,
         vibrate: severity === "critical" ? [200, 100, 200, 100, 400] : [200]
       }
     }
   });
 
-  // Clean up stale/invalid tokens automatically
+  // Clean up stale/invalid tokens automatically.
   const invalidKeys = [];
   response.responses.forEach((resp, idx) => {
     if (!resp.success) {
@@ -128,14 +135,16 @@ async function sendFCMMulticast({ title, body, severity, type, lat, lng }) {
         code === "messaging/invalid-registration-token" ||
         code === "messaging/registration-token-not-registered"
       ) {
-        invalidKeys.push(filtered[idx][0]); // key in RTDB
+        invalidKeys.push(validEntries[idx][0]);
       }
     }
   });
 
   if (invalidKeys.length > 0) {
     const updates = {};
-    invalidKeys.forEach(k => { updates[`fcm_tokens/${k}`] = null; });
+    invalidKeys.forEach((k) => {
+      updates[`fcm_tokens/${k}`] = null;
+    });
     db.ref().update(updates).catch(console.error);
   }
 
@@ -148,17 +157,20 @@ async function sendFCMMulticast({ title, body, severity, type, lat, lng }) {
   };
 }
 
-/* ── EMAIL SERVICE (geofenced) ─────────────────────────── */
+/* ---- Email service (geofenced) --------------------------- */
 const HIGH_OR_CRITICAL = new Set(["high", "critical"]);
 
 function buildEmailHtml({ type, severity, description, lat, lng }) {
   const sevColor = severity === "critical" ? "#ef4444" : "#fb923c";
+  const latNum = toFiniteNumber(lat);
+  const lngNum = toFiniteNumber(lng);
+
   const locationRow =
-    lat && lng
+    latNum != null && lngNum != null
       ? `<tr>
           <td style="padding:8px 12px;color:#94a3b8;font-size:13px;">Location</td>
           <td style="padding:8px 12px;color:#f1f5f9;">
-            Lat: ${parseFloat(lat).toFixed(4)}, Lng: ${parseFloat(lng).toFixed(4)}
+            Lat: ${latNum.toFixed(4)}, Lng: ${lngNum.toFixed(4)}
           </td>
         </tr>`
       : "";
@@ -168,14 +180,12 @@ function buildEmailHtml({ type, severity, description, lat, lng }) {
 <body style="margin:0;padding:20px;background:#0f172a;">
 <div style="font-family:'Segoe UI',Arial,sans-serif;max-width:600px;margin:0 auto;background:#1e293b;color:#e2e8f0;border-radius:14px;overflow:hidden;border:1px solid rgba(239,68,68,0.3);">
 
-  <!-- Header -->
   <div style="background:linear-gradient(135deg,#991b1b,#7f1d1d);padding:28px 24px;text-align:center;">
-    <div style="font-size:36px;margin-bottom:8px;">🚨</div>
+    <div style="font-size:36px;margin-bottom:8px;">[ALERT]</div>
     <h1 style="margin:0;font-size:22px;font-weight:700;color:#fff;letter-spacing:1px;">DISASTER ALERT</h1>
     <div style="margin-top:8px;font-size:13px;color:#fca5a5;">${new Date().toLocaleString()}</div>
   </div>
 
-  <!-- Alert Details -->
   <div style="padding:24px;">
     <table style="width:100%;border-collapse:collapse;">
       <tr>
@@ -193,15 +203,13 @@ function buildEmailHtml({ type, severity, description, lat, lng }) {
       ${locationRow}
     </table>
 
-    <!-- Warning box -->
     <div style="margin-top:20px;padding:14px 16px;background:rgba(239,68,68,0.08);border-radius:8px;border-left:3px solid #ef4444;">
       <p style="margin:0;font-size:13px;color:#fca5a5;line-height:1.6;">
-        ⚠&nbsp; <strong>Stay safe.</strong> Follow all official emergency broadcasts.
+        WARNING: <strong>Stay safe.</strong> Follow all official emergency broadcasts.
         Do not enter affected areas. Move to higher ground if advised.
       </p>
     </div>
 
-    <!-- Footer -->
     <p style="margin-top:20px;font-size:11px;color:#475569;text-align:center;">
       You received this alert because you subscribed to Disaster Alert notifications.<br>
       <small style="color:#334155">Alerts are filtered to your area (${GEOFENCE_RADIUS_KM}km radius).</small>
@@ -221,44 +229,38 @@ async function sendEmailAlerts({ type, severity, description, lat, lng }) {
   const gmailPass = process.env.GMAIL_APP_PASSWORD;
 
   if (!gmailUser || !gmailPass) {
-    console.warn("[email-diag] GMAIL_USER or GMAIL_APP_PASSWORD not set in Vercel env vars.");
+    console.warn("[email-diag] GMAIL_USER or GMAIL_APP_PASSWORD not set in env vars.");
     return { skipped: true, reason: "env_missing" };
   }
 
   console.info(`[email-diag] Processing ${type} alert (${severity}).`);
 
-  // Fetch subscriber list (stored under fcm_tokens to access location)
   const db = getAdminDb();
   const snap = await db.ref("fcm_tokens").once("value");
   const tokensMap = snap.val() || {};
 
-  // Also fetch plain email subscribers (no location)
   const emailSnap = await db.ref("subscribers").once("value");
   const emailSubs = emailSnap.val() || {};
 
-  // Build a unified list of {email, location}
   const recipients = [];
 
-  // From fcm_tokens (have location + optional email)
-  Object.values(tokensMap).forEach(v => {
-    if (v.email && v.email.includes("@")) {
-      if (isWithinRadius(lat, lng, v.location)) {
-        recipients.push(v.email.toLowerCase());
-      }
-    }
-  });
-
-  // From subscribers (no location — always notify)
-  Object.values(emailSubs).forEach(v => {
-    if (v.email && v.email.includes("@")) {
+  Object.values(tokensMap).forEach((v) => {
+    if (v?.email && v.email.includes("@") && isWithinRadius(lat, lng, v.location)) {
       recipients.push(v.email.toLowerCase());
     }
   });
 
-  // Deduplicate emails
+  Object.values(emailSubs).forEach((v) => {
+    if (v?.email && v.email.includes("@") && isWithinRadius(lat, lng, v.location)) {
+      recipients.push(v.email.toLowerCase());
+    }
+  });
+
   const emails = [...new Set(recipients)];
 
-  console.info(`[email-diag] Recipients found: ${emails.length} (From DB: ${entries.length} fcm, ${Object.keys(emailSubs).length} subscribers)`);
+  console.info(
+    `[email-diag] Recipients found: ${emails.length} (From DB: ${Object.keys(tokensMap).length} fcm, ${Object.keys(emailSubs).length} subscribers)`
+  );
 
   if (emails.length === 0) {
     console.info("[email-diag] No matching subscribers found for this location/severity.");
@@ -270,11 +272,11 @@ async function sendEmailAlerts({ type, severity, description, lat, lng }) {
     auth: { user: gmailUser, pass: gmailPass }
   });
 
-  const subject = `🚨 ${(severity || "").toUpperCase()} ALERT: ${type} Detected`;
+  const subject = `[ALERT] ${(severity || "").toUpperCase()} ALERT: ${type} Detected`;
   const html = buildEmailHtml({ type, severity, description, lat, lng });
 
   const results = await Promise.allSettled(
-    emails.map(to =>
+    emails.map((to) =>
       transporter.sendMail({
         from: `"Disaster Alert System" <${gmailUser}>`,
         to,
@@ -284,24 +286,33 @@ async function sendEmailAlerts({ type, severity, description, lat, lng }) {
     )
   );
 
-  const sent = results.filter(r => r.status === "fulfilled").length;
-  const failedResults = results.filter(r => r.status === "rejected");
+  const sent = results.filter((r) => r.status === "fulfilled").length;
+  const failedResults = results.filter((r) => r.status === "rejected");
   const failedCount = failedResults.length;
 
   if (failedCount > 0) {
-    failedResults.forEach((r, idx) => console.error(`[email-diag] Delivery error #${idx + 1}:`, r.reason));
+    failedResults.forEach((r, idx) => {
+      console.error(`[email-diag] Delivery error #${idx + 1}:`, r.reason);
+    });
   }
 
   console.info(`[email-diag] Emails sent: ${sent}, Failed: ${failedCount}`);
   return { sent, failed: failedCount, total: emails.length };
 }
 
-/* ── HANDLER ──────────────────────────────────────────── */
+/* ---- Handler --------------------------------------------- */
 export default async function handler(req, res) {
   setCors(res);
   if (req.method === "OPTIONS") return res.status(200).end();
-  if (req.method !== "POST")
+  if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
+  }
+
+  const apiKey = req.headers["x-api-key"] || req.headers["authorization"]?.replace("Bearer ", "");
+  const expectedKey = process.env.ALERT_API_KEY || "default_dev_key";
+  if (apiKey !== expectedKey) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
 
   const {
     type = "Unknown",
@@ -312,28 +323,39 @@ export default async function handler(req, res) {
   } = req.body ?? {};
 
   try {
-    const normSev = severity.toLowerCase();
+    const normSev = String(severity || "low").toLowerCase();
+    const displayLevel = normSev.charAt(0).toUpperCase() + normSev.slice(1);
+    const alertLat = toFiniteNumber(lat);
+    const alertLng = toFiniteNumber(lng);
 
     const [fcmResult, emailResult] = await Promise.allSettled([
       sendFCMMulticast({
-        title: `${type} — ${normSev.toUpperCase()}`,
+        title: `${type} - ${displayLevel.toUpperCase()}`,
         body: description || "Emergency nearby. Stay safe.",
         severity: normSev,
         type,
-        lat,
-        lng
+        lat: alertLat,
+        lng: alertLng
       }),
-      sendEmailAlerts({ type, severity: normSev, description, lat, lng })
+      sendEmailAlerts({
+        type,
+        severity: normSev,
+        description,
+        lat: alertLat,
+        lng: alertLng
+      })
     ]);
 
     return res.status(200).json({
       success: true,
-      fcm: fcmResult.status === "fulfilled"
-        ? fcmResult.value
-        : { error: fcmResult.reason?.message },
-      email: emailResult.status === "fulfilled"
-        ? emailResult.value
-        : { error: emailResult.reason?.message }
+      fcm:
+        fcmResult.status === "fulfilled"
+          ? fcmResult.value
+          : { error: fcmResult.reason?.message },
+      email:
+        emailResult.status === "fulfilled"
+          ? emailResult.value
+          : { error: emailResult.reason?.message }
     });
   } catch (err) {
     console.error("[/api/alert] Error:", err);

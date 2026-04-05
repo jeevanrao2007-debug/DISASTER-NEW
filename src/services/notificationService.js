@@ -12,8 +12,16 @@
 import { getMessaging, getToken } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
 import { app } from "../config/firebase.js";
 
-const VAPID_KEY =
+const FALLBACK_VAPID_KEY =
   "BPB4AgB1jx0U7iAjyGRW4DBe2Z5hqWXS0s-ir0jBiAUZiMWlIMXdUNtaJyyc07Q7Ye5tvkSu0L5b_3z3_MXl7qg";
+
+function resolveVapidKey() {
+  const runtimeConfigKey = globalThis?.DISASTER_ALERT_CONFIG?.vapidKey;
+  const windowKey = globalThis?.VITE_VAPID_KEY;
+  const localOverride = localStorage.getItem("vapid_key");
+
+  return runtimeConfigKey || windowKey || localOverride || FALLBACK_VAPID_KEY;
+}
 
 const API_BASE = "/api"; // Vercel serverless base path
 
@@ -63,12 +71,14 @@ export async function subscribeUser(email) {
   }
 
   try {
+    const vapidKey = resolveVapidKey();
+
     // Step 2: Ensure service worker
     const swReg = await ensureServiceWorker();
 
     // Step 3: Get FCM token
     const token = await getToken(getMsg(), {
-      vapidKey: VAPID_KEY,
+      vapidKey,
       serviceWorkerRegistration: swReg
     });
 
@@ -86,7 +96,10 @@ export async function subscribeUser(email) {
       body: JSON.stringify({ token, email: email || null, location })
     });
 
-    if (!resp.ok) throw new Error(`Server error: ${resp.status}`);
+    if (!resp.ok) {
+      const errBody = await resp.json().catch(() => ({}));
+      throw new Error(`Server error: ${resp.status} - ${errBody.error || errBody.message || resp.statusText}`);
+    }
 
     localStorage.setItem("fcm_token", token);
     localStorage.setItem("subscribed_email", email || "");
@@ -108,7 +121,10 @@ export async function triggerNotification(alert) {
   try {
     const resp = await fetch(`${API_BASE}/alert`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": globalThis?.DISASTER_ALERT_CONFIG?.apiKey || "default_dev_key"
+      },
       body: JSON.stringify({
         type:        alert.type        || "Alert",
         severity:    alert.severity    || alert.level || "low",

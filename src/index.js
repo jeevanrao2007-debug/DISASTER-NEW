@@ -41,6 +41,7 @@ listenForAlerts((data) => {
   bumpHeartbeat();
 
   const bounds = [];
+  const newBounds = [];
   let critical = false;
   const currentIds = new Set(Object.keys(data));
   const newIds = [...currentIds].filter(id => !previousAlertIds.has(id));
@@ -84,8 +85,8 @@ listenForAlerts((data) => {
         isCritical ? "critical" : isHigh ? "warning" : "info"
       );
 
-      // Pan to new alert
-      flyToMarker([a.lat, a.lng], 13, 1.2);
+      // Collect new alert bounds instead of panning multiple times
+      newBounds.push([a.lat, a.lng]);
     }
   });
 
@@ -99,6 +100,12 @@ listenForAlerts((data) => {
   if (isInitialLoad && bounds.length > 0) {
     fitMapBounds(bounds, [60, 60]);
     isInitialLoad = false;
+  } else if (newBounds.length > 0) {
+    if (newBounds.length === 1) {
+      flyToMarker(newBounds[0], 13, 1.2);
+    } else {
+      fitMapBounds(newBounds, [60, 60]);
+    }
   }
 
   // Alarm and critical UI

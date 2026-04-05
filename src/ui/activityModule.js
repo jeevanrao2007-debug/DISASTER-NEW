@@ -5,7 +5,6 @@
    ========================================================= */
 
 const activityList = document.getElementById("activityList");
-let activityTimes = []; // { el, ts } pairs for live time-ago refresh
 
 /**
  * Prepend a new entry to the activity stream.
@@ -25,7 +24,6 @@ export function addActivity(text, dotClass = "", timestamp = Date.now()) {
     <span class="ai-time" data-ts="${timestamp}">now</span>
   `;
   activityList.insertBefore(li, activityList.firstChild);
-  activityTimes.push({ el: li.querySelector(".ai-time"), ts: timestamp });
 }
 
 /** Human-readable relative time string */
@@ -38,7 +36,9 @@ function timeAgo(ms) {
 
 // Refresh all timestamps every 5 seconds
 setInterval(() => {
-  activityTimes.forEach(({ el, ts }) => { el.textContent = timeAgo(ts); });
+  document.querySelectorAll('.ai-time').forEach((el) => { 
+    if (el.dataset.ts) el.textContent = timeAgo(Number(el.dataset.ts)); 
+  });
 }, 5000);
 
 // Expose globally so messaging.js can call it
