@@ -40,7 +40,8 @@ function getMsg() {
 let _swReg = null;
 async function ensureServiceWorker() {
   if (_swReg) return _swReg;
-  _swReg = await navigator.serviceWorker.register("/firebase-messaging-sw.js");
+  await navigator.serviceWorker.register("/firebase-messaging-sw.js");
+  _swReg = await navigator.serviceWorker.ready;
   return _swReg;
 }
 
