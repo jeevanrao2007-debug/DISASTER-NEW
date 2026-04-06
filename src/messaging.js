@@ -10,23 +10,23 @@
 
 import { getMessaging, onMessage }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
-import { app } from "./src/config/firebase.js";
+import { app } from "./config/firebase.js";
 
 const NOTIFICATION_ICON_URL = "https://cdn-icons-png.flaticon.com/512/564/564619.png";
 
-/* Register service worker (required for background notifications) */
-if ("serviceWorker" in navigator) {
-  navigator.serviceWorker
-    .register("/firebase-messaging-sw.js")
-    .then(reg => console.log("[FCM] Service Worker registered:", reg.scope))
-    .catch(err => console.error("[FCM] Service Worker registration failed:", err));
-}
+/* NOTE: Service worker is registered in notificationService.js during subscribeUser().
+   Do not register again here to avoid lifecycle conflicts. */
 
 /* ── FOREGROUND MESSAGE HANDLER ─────────────────────────── */
 const messaging = getMessaging(app);
 
 onMessage(messaging, payload => {
   console.log("[FCM] Foreground message received:", payload);
+
+  if (!payload || !payload.notification) {
+    console.warn("[FCM] Received message without notification field. Skipping foreground handling.");
+    return;
+  }
 
   const title = payload.notification?.title || "Disaster Alert";
   const body  = payload.notification?.body  || "Emergency warning nearby";

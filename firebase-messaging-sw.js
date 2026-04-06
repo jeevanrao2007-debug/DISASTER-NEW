@@ -17,6 +17,11 @@ const messaging = firebase.messaging();
 
 /* BACKGROUND MESSAGE HANDLER */
 messaging.onBackgroundMessage(function(payload) {
+  
+  if (!payload || !payload.notification) {
+    console.warn("[FCM Service Worker] Received message without notification field. Skipping.");
+    return;
+  }
 
   const title = payload.notification.title || "Disaster Alert";
   const body = payload.notification.body || "Emergency warning nearby";

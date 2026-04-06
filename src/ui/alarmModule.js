@@ -4,7 +4,7 @@
    Handles browser autoplay policy with explicit user-unlock.
    ========================================================= */
 
-const alarm     = new Audio("/alarm.mp3");
+const alarm     = new Audio("/assets/audio/alarm.mp3");
 alarm.loop      = true;
 alarm.volume    = 1;
 

@@ -1,7 +1,7 @@
 /* ================= IMPORTS ================= */
 
 import { getDatabase, ref, set, get, child } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
-import { app } from "./src/config/firebase.js";
+import { app } from "./config/firebase.js";
 
 /* ================= SYSTEM CONSTANTS ================= */
 const TARGET_LAT = 13.08;
@@ -23,6 +23,11 @@ async function exists(id){
 async function detectEarthquake(){
   try{
     const res = await fetch("https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_hour.geojson");
+    
+    if (!res.ok) {
+      throw new Error(`[earthquake] HTTP error: ${res.status} ${res.statusText}`);
+    }
+    
     const data = await res.json();
 
     for(const eq of data.features){
@@ -57,7 +62,7 @@ async function detectEarthquake(){
     }
 
   }catch(e){
-    console.log("Earthquake detection error",e);
+    console.error("[detectEarthquake] Earthquake detection error:", e.message);
   }
 }
 
@@ -66,6 +71,11 @@ async function detectEarthquake(){
 async function detectFlood(){
   try{
     const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${TARGET_LAT}&longitude=${TARGET_LNG}&hourly=rain`);
+    
+    if (!res.ok) {
+      throw new Error(`[flood] HTTP error: ${res.status} ${res.statusText}`);
+    }
+    
     const data = await res.json();
 
     const rain = (data?.hourly?.rain && data.hourly.rain.length > 0) ? Math.max(...data.hourly.rain) : 0;
@@ -92,7 +102,7 @@ async function detectFlood(){
     console.log("Flood risk stored");
 
   }catch(e){
-    console.log("Flood detection error",e);
+    console.error("[detectFlood] Flood detection error:", e.message);
   }
 }
 
@@ -101,6 +111,11 @@ async function detectFlood(){
 async function detectFire(){
   try{
     const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${TARGET_LAT}&longitude=${TARGET_LNG}&current_weather=true`);
+    
+    if (!res.ok) {
+      throw new Error(`[fire] HTTP error: ${res.status} ${res.statusText}`);
+    }
+    
     const data = await res.json();
 
     const temp = data?.current_weather?.temperature ?? 0;
@@ -127,7 +142,7 @@ async function detectFire(){
     console.log("Fire risk stored");
 
   }catch(e){
-    console.log("Fire detection error",e);
+    console.error("[detectFire] Fire detection error:", e.message);
   }
 }
 
@@ -136,6 +151,11 @@ async function detectFire(){
 async function detectCyclone(){
   try{
     const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${TARGET_LAT}&longitude=${TARGET_LNG}&hourly=windspeed_10m`);
+    
+    if (!res.ok) {
+      throw new Error(`[cyclone] HTTP error: ${res.status} ${res.statusText}`);
+    }
+    
     const data = await res.json();
 
     const wind = (data?.hourly?.windspeed_10m && data.hourly.windspeed_10m.length > 0) ? Math.max(...data.hourly.windspeed_10m) : 0;
@@ -162,7 +182,7 @@ async function detectCyclone(){
     console.log("Cyclone risk stored");
 
   }catch(e){
-    console.log("Cyclone detection error",e);
+    console.error("[detectCyclone] Cyclone detection error:", e.message);
   }
 }
 

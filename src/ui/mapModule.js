@@ -115,7 +115,7 @@ export function addMarker(latlng, severity, data, id, isAdmin = false, customPop
         }</small>
     `;
     if (isAdmin) {
-      popupHtml += `<br><br><button onclick="window.deleteAlert('${id}')">🗑 Remove Alert</button>`;
+      popupHtml += `<br><br><button data-action="delete" data-alert-id="${id}" style="padding:4px 10px;background:#dc2626;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px">🗑 Remove Alert</button>`;
     }
     popupHtml += `</div>`;
   }

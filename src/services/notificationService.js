@@ -12,15 +12,18 @@
 import { getMessaging, getToken } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
 import { app } from "../config/firebase.js";
 
-const FALLBACK_VAPID_KEY =
-  "BPB4AgB1jx0U7iAjyGRW4DBe2Z5hqWXS0s-ir0jBiAUZiMWlIMXdUNtaJyyc07Q7Ye5tvkSu0L5b_3z3_MXl7qg";
-
 function resolveVapidKey() {
   const runtimeConfigKey = globalThis?.DISASTER_ALERT_CONFIG?.vapidKey;
   const windowKey = globalThis?.VITE_VAPID_KEY;
   const localOverride = localStorage.getItem("vapid_key");
 
-  return runtimeConfigKey || windowKey || localOverride || FALLBACK_VAPID_KEY;
+  const vapidKey = runtimeConfigKey || windowKey || localOverride;
+  if (!vapidKey) {
+    throw new Error(
+      "VAPID key not configured. Set DISASTER_ALERT_CONFIG.vapidKey, VITE_VAPID_KEY, or localStorage.vapid_key."
+    );
+  }
+  return vapidKey;
 }
 
 const API_BASE = "/api"; // Vercel serverless base path
@@ -71,7 +74,13 @@ export async function subscribeUser(email) {
   }
 
   try {
-    const vapidKey = resolveVapidKey();
+    let vapidKey;
+    try {
+      vapidKey = resolveVapidKey();
+    } catch (keyErr) {
+      console.error("[notificationService]", keyErr.message);
+      return { success: false, message: keyErr.message };
+    }
 
     // Step 2: Ensure service worker
     const swReg = await ensureServiceWorker();
@@ -119,11 +128,19 @@ export async function subscribeUser(email) {
  */
 export async function triggerNotification(alert) {
   try {
+    const apiKey = globalThis?.DISASTER_ALERT_CONFIG?.apiKey;
+    if (!apiKey) {
+      console.warn(
+        "[notificationService] Missing API key: DISASTER_ALERT_CONFIG.apiKey not configured. Notifications will not be dispatched."
+      );
+      return { error: "API key not configured" };
+    }
+
     const resp = await fetch(`${API_BASE}/alert`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-api-key": globalThis?.DISASTER_ALERT_CONFIG?.apiKey || "default_dev_key"
+        "x-api-key": apiKey
       },
       body: JSON.stringify({
         type:        alert.type        || "Alert",
@@ -132,12 +149,19 @@ export async function triggerNotification(alert) {
       })
     });
 
+    if (!resp.ok) {
+      const errBody = await resp.json().catch(() => ({}));
+      throw new Error(
+        `API error ${resp.status}: ${errBody.error || resp.statusText}`
+      );
+    }
+
     const result = await resp.json();
     console.info("[notificationService] Dispatch result:", result);
     return result;
   } catch (err) {
-    console.warn("[notificationService] Dispatch failed:", err);
-    return null;
+    console.error("[notificationService] Dispatch failed:", err.message);
+    return { error: err.message };
   }
 }
 

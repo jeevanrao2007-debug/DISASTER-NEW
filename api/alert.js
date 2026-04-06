@@ -24,11 +24,19 @@
 import nodemailer from "nodemailer";
 import { getAdminDb, getAdminMessaging } from "./_firebaseAdmin.js";
 
+/* ---- EMAIL VALIDATION --------------------------------- */
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function isValidEmail(email) {
+  if (!email || typeof email !== "string") return false;
+  return EMAIL_REGEX.test(email.trim());
+}
+
 /* ---- CORS ------------------------------------------------ */
 function setCors(res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, x-api-key");
 }
 
 /* ---- Sanitization ---------------------------------------- */
@@ -202,13 +210,13 @@ async function sendEmailAlerts({ type, severity, description }) {
   const recipients = [];
 
   Object.values(tokensMap).forEach((v) => {
-    if (v?.email && v.email.includes("@")) {
+    if (v?.email && isValidEmail(v.email)) {
       recipients.push(v.email.toLowerCase());
     }
   });
 
   Object.values(emailSubs).forEach((v) => {
-    if (v?.email && v.email.includes("@")) {
+    if (v?.email && isValidEmail(v.email)) {
       recipients.push(v.email.toLowerCase());
     }
   });

@@ -13,6 +13,14 @@
 import { createHash } from "node:crypto";
 import { getAdminDb } from "./_firebaseAdmin.js";
 
+// Email validation regex (RFC 5322 simplified)
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function isValidEmail(email) {
+  if (!email || typeof email !== "string") return false;
+  return EMAIL_REGEX.test(email.trim());
+}
+
 // CORS headers shared with all API routes
 function setCors(res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -47,12 +55,14 @@ export default async function handler(req, res) {
     });
 
     // Persist email separately for bulk-email fan-out
-    if (email && typeof email === "string" && email.includes("@")) {
+    if (email && isValidEmail(email)) {
       const emailKey = email.toLowerCase().replace(/[.@+]/g, "_");
       await db.ref(`subscribers/${emailKey}`).set({
         email: email.toLowerCase(),
         subscribedAt: Date.now()
       });
+    } else if (email) {
+      console.warn(`[/api/register] Invalid email format rejected: ${email}`);
     }
 
     return res.status(200).json({ success: true, message: "Token registered" });

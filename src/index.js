@@ -56,7 +56,11 @@ listenForAlerts((data) => {
 
   // Rebuild map markers
   Object.entries(data).forEach(([id, a]) => {
-    if (a.lat == null || a.lng == null) return;
+    // Ensure coordinates are valid numbers
+    if (typeof a.lat !== "number" || typeof a.lng !== "number" || !isFinite(a.lat) || !isFinite(a.lng)) {
+      console.warn(`[index] Alert ${id} has invalid coordinates:`, a.lat, a.lng);
+      return;
+    }
     
     // Check severity/level depending on schema migration state
     const severity = a.level || a.severity || "Low";

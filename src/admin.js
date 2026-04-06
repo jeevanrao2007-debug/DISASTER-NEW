@@ -95,6 +95,27 @@ function setupInit() {
 }
 
 function setupMapEvents() {
+  // Event delegation for popup buttons
+  map.on("popupopen", function(e) {
+    const popup = e.popup;
+    const popupEl = popup._contentNode;
+    if (!popupEl) return;
+
+    popupEl.addEventListener("click", async (evt) => {
+      const btn = evt.target.closest("button[data-action]");
+      if (!btn) return;
+
+      const action = btn.dataset.action;
+      const alertId = btn.dataset.alertId;
+
+      if (action === "resolve") {
+        await window.resolveAlert(alertId);
+      } else if (action === "delete") {
+        await window.deleteAlert(alertId);
+      }
+    });
+  });
+
   map.on("mousemove", e => {
     if (coordsText) {
       coordsText.innerText = `Lat ${e.latlng.lat.toFixed(5)} | Lng ${e.latlng.lng.toFixed(5)}`;
@@ -173,12 +194,12 @@ function setupAlertsListener() {
           <small style="color:#64748b">Expires: ${expiryStr}</small>
           ${a.description || a.desc ? `<br><small style="color:#cbd5e1">${a.description || a.desc}</small>` : ""}
           <br><br>
-          <button onclick="window.resolveAlert('${id}')"
+          <button data-action="resolve" data-alert-id="${id}"
             style="margin-right:6px;padding:4px 10px;background:#16a34a;color:#fff;
                    border:none;border-radius:6px;cursor:pointer;font-size:12px">
             ✔ Resolve
           </button>
-          <button onclick="window.deleteAlert('${id}')"
+          <button data-action="delete" data-alert-id="${id}"
             style="padding:4px 10px;background:#dc2626;color:#fff;
                    border:none;border-radius:6px;cursor:pointer;font-size:12px">
             🗑 Delete
@@ -228,8 +249,6 @@ window.publish = async () => {
   const levelVal = document.getElementById("level").value;
   const descVal = document.getElementById("desc").value;
 
-  animateBroadcast(true);
-
   try {
     const newAlert = {
       type: typeVal,
@@ -245,7 +264,10 @@ window.publish = async () => {
     };
 
     await publishAlert(newAlert);
-    triggerNotification(newAlert);
+    await triggerNotification(newAlert);
+
+    // Only animate success after both publish and notification dispatch complete
+    animateBroadcast(true);
 
     if (previewMarker) { previewMarker.remove(); previewMarker = null; }
     selected = null;
@@ -257,6 +279,7 @@ window.publish = async () => {
 
   } catch (e) {
     animateBroadcast(false);
+    console.error("[admin.publish] Error:", e);
     showToast("Publish Failed", "Database write error — try again.", "warning");
   }
 };
@@ -321,12 +344,20 @@ window.approve = async (id) => {
     card.classList.add("approving");
   }
   setTimeout(async () => {
-    const approvedAlert = await approvePendingAlert(id);
-    if (!approvedAlert) return;
-    const severity = approvedAlert.level || approvedAlert.severity;
-    logActivity(`Approved: ${approvedAlert.type} — ${severity}`, "green");
-    showToast("Alert Approved", `${approvedAlert.type} moved to live alerts & broadcast sent.`, "success");
-    triggerNotification(approvedAlert);
+    try {
+      const approvedAlert = await approvePendingAlert(id);
+      if (!approvedAlert) {
+        showToast("Approval Failed", "Alert not found in pending list.", "warning");
+        return;
+      }
+      const severity = approvedAlert.level || approvedAlert.severity;
+      logActivity(`Approved: ${approvedAlert.type} — ${severity}`, "green");
+      showToast("Alert Approved", `${approvedAlert.type} moved to live alerts & broadcast sent.`, "success");
+      await triggerNotification(approvedAlert);
+    } catch (err) {
+      console.error("[admin.approve] Error:", err);
+      showToast("Approval Error", "Failed to approve alert. Check console.", "warning");
+    }
   }, 460);
 };
 
@@ -337,8 +368,13 @@ window.reject = async (id) => {
     card.classList.add("rejecting");
   }
   setTimeout(async () => {
-    await rejectPendingAlert(id);
-    logActivity("Alert rejected", "red");
-    showToast("Alert Rejected", "Pending alert dismissed.", "warning");
+    try {
+      await rejectPendingAlert(id);
+      logActivity("Alert rejected", "red");
+      showToast("Alert Rejected", "Pending alert dismissed.", "warning");
+    } catch (err) {
+      console.error("[admin.reject] Error:", err);
+      showToast("Rejection Error", "Failed to reject alert. Check console.", "warning");
+    }
   }, 360);
 };
