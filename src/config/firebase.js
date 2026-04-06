@@ -17,7 +17,7 @@ export const firebaseConfig = {
   messagingSenderId: "359144434898",
   appId:             "1:359144434898:web:844f9278880b73291c110b",
   vapidKey:          "BPB4AgB1jx0U7iAjyGRW4DBe2Z5hqWXS0s-ir0jBiAUZiMWlIMXdUNtaJyyc07Q7Ye5tvkSu0L5b_3z3_MXl7qg",
-  apiKey:            "admin_secret_key_change_me" // This must match ALERT_API_KEY in Vercel
+  apiKey:            "admin_secret_key_1212"
 };
 
 // Guard: reuse existing app if already initialized by another module
