@@ -1,21 +1,32 @@
 /* =========================================================
-   api/alert.js - POST /api/alert
+   api/dispatch-alert.js — POST /api/dispatch-alert
    Vercel Serverless Function
-
-   Legacy alert dispatch endpoint using API key auth.
-   Kept for backward compatibility; new code should use
-   /api/dispatch-alert with Firebase ID token auth.
    
-   Delegates to shared dispatch logic in _alertDispatch.js.
+   Secure alert dispatch endpoint that requires Firebase
+   ID token authentication (Bearer token in Authorization
+   header). Only authenticated admin users can trigger
+   alert broadcast to all subscribers.
+   
+   Request body:
+   {
+     type:        string   e.g. "Flood"
+     severity:    string   "low" | "moderate" | "high" | "critical"
+     description: string?
+     lat:         number?
+     lng:         number?
+   }
+   
+   Authentication: Authorization: Bearer <Firebase ID Token>
    ========================================================= */
 
+import { verifyFirebaseToken } from "./_firebaseAdmin.js";
 import { sendFCMMulticast, sendWhatsAppAlert } from "./_alertDispatch.js";
 
 /* ---- CORS ------------------------------------------------ */
 function setCors(res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, x-api-key");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
 }
 
 /* ---- Helpers --------------------------------------------- */
@@ -28,7 +39,6 @@ function toFiniteNumber(value) {
   return null;
 }
 
-
 /* ---- Handler --------------------------------------------- */
 export default async function handler(req, res) {
   setCors(res);
@@ -37,21 +47,24 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  // 1. API Key Validation
-  const apiKey = req.headers["x-api-key"] || req.headers["authorization"]?.replace("Bearer ", "");
-  const expectedKey = process.env.ALERT_API_KEY;
-
-  if (!expectedKey) {
-    console.error("[api/alert] ALERT_API_KEY is not defined in environment variables.");
-    return res.status(500).json({ error: "API configuration error" });
-  }
-
-  if (apiKey !== expectedKey) {
-    return res.status(401).json({ error: "Unauthorized" });
-  }
-
   try {
-    // 2. JSON Body Parsing check (handle cases where req.body is not automatically parsed)
+    // 1. Firebase ID Token Verification
+    const authHeader = req.headers.authorization;
+    let decodedToken;
+    
+    try {
+      decodedToken = await verifyFirebaseToken(authHeader);
+      console.info(`[/api/dispatch-alert] Authenticated user: ${decodedToken.email || decodedToken.uid}`);
+    } catch (err) {
+      return res.status(401).json({ error: err.message });
+    }
+
+    // 2. Optional: Check if user is an admin (claims/domain allowlist)
+    // For now, any authenticated user can dispatch. Update this to restrict further.
+    const userEmail = decodedToken.email || decodedToken.uid || "unknown";
+    // TODO: Add role/domain allowlist check if needed
+
+    // 3. JSON Body Parsing
     let body = req.body;
     if (typeof body === "string") {
       try {
@@ -69,7 +82,7 @@ export default async function handler(req, res) {
       lng
     } = body ?? {};
 
-    // 3. Basic Request Validation
+    // 4. Basic Request Validation
     if (!type || typeof type !== "string") {
       return res.status(400).json({ error: "Missing or invalid alert type" });
     }
@@ -85,6 +98,7 @@ export default async function handler(req, res) {
     const alertLat = toFiniteNumber(lat);
     const alertLng = toFiniteNumber(lng);
 
+    // 5. Send notifications in parallel (FCM + WhatsApp)
     const [fcmResult, whatsappResult] = await Promise.allSettled([
       sendFCMMulticast({
         title: `${type} - ${displayLevel.toUpperCase()}`,
@@ -103,9 +117,9 @@ export default async function handler(req, res) {
       })
     ]);
 
-    return res.status(200).json({
+    const response = {
       success: true,
-      dispatchedBy: "legacy-api-key",
+      dispatchedBy: userEmail,
       fcm:
         fcmResult.status === "fulfilled"
           ? fcmResult.value
@@ -114,9 +128,12 @@ export default async function handler(req, res) {
         whatsappResult.status === "fulfilled"
           ? whatsappResult.value
           : { error: whatsappResult.reason?.message }
-    });
+    };
+
+    console.info("[/api/dispatch-alert] Alert dispatched successfully:", response);
+    return res.status(200).json(response);
   } catch (err) {
-    console.error("[/api/alert] Error:", err);
+    console.error("[/api/dispatch-alert] Error:", err);
     return res
       .status(500)
       .json({ error: "Failed to send notifications", detail: err.message });

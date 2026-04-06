@@ -31,6 +31,14 @@ app.all("/api/alert", async (req, res) => {
   return runLocalHandler("./alert.js", "/api/alert", req, res);
 });
 
+app.all("/api/dispatch-alert", async (req, res) => {
+  return runLocalHandler("./dispatch-alert.js", "/api/dispatch-alert", req, res);
+});
+
+app.all("/api/runtime-config", async (req, res) => {
+  return runLocalHandler("./runtime-config.js", "/api/runtime-config", req, res);
+});
+
 app.all("/api/cron", async (req, res) => {
   return runLocalHandler("./cron.js", "/api/cron", req, res);
 });

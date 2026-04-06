@@ -3,14 +3,16 @@
    Phase 2: Full implementation
 
    Responsibilities:
-   • subscribeUser(email) — requests permission, gets FCM
-     token, stores it + email in Firebase via /api/register
-   • triggerNotification(alert) — calls /api/alert to fan
-     out push + email notifications
+   • subscribeUser(payload) — requests permission, gets FCM
+     token, stores token + optional WhatsApp opt-in fields
+     in Firebase via /api/register
+   • triggerNotification(alert) — calls /api/dispatch-alert
+     to fan out push + WhatsApp notifications
    ========================================================= */
 
 import { getMessaging, getToken } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
 import { app, firebaseConfig } from "../config/firebase.js";
+import { normalizePhoneE164 } from "../utils/phone.js";
 
 function resolveVapidKey() {
   const runtimeConfigKey = globalThis?.DISASTER_ALERT_CONFIG?.vapidKey;
@@ -63,12 +65,30 @@ function getUserLocation() {
  * 2. Register service worker
  * 3. Get FCM token
  * 4. Capture user location (optional)
- * 5. POST {token, email, location} to /api/register
+ * 5. POST {token, location, whatsappNumber, whatsappOptIn} to /api/register
  *
- * @param {string} email - User-provided email address
+ * @param {Object|string} payload - Optional subscription payload
+ * @param {string} payload.whatsappNumber - Optional E.164 number
+ * @param {boolean} payload.whatsappOptIn - Explicit WhatsApp opt-in
  * @returns {{ success: boolean, message: string }}
  */
-export async function subscribeUser(email) {
+export async function subscribeUser(payload = {}) {
+  const normalizedPayload = typeof payload === "string"
+    ? { whatsappNumber: payload, whatsappOptIn: true }
+    : (payload || {});
+
+  const rawWhatsApp = String(normalizedPayload.whatsappNumber || "").trim();
+  const whatsappNumber = normalizePhoneE164(rawWhatsApp) || "";
+  const whatsappOptIn = Boolean(normalizedPayload.whatsappOptIn);
+  const effectiveWhatsAppOptIn = whatsappOptIn && Boolean(whatsappNumber);
+
+  if (whatsappOptIn && rawWhatsApp && !whatsappNumber) {
+    return {
+      success: false,
+      message: "Enter a valid WhatsApp number in E.164 format (example: +919876543210)."
+    };
+  }
+
   // Step 1: Request permission
   const permission = await Notification.requestPermission();
   if (permission !== "granted") {
@@ -104,7 +124,12 @@ export async function subscribeUser(email) {
     const resp = await fetch(`${API_BASE}/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token, email: email || null, location })
+      body: JSON.stringify({
+        token,
+        location,
+        whatsappNumber: whatsappNumber || null,
+        whatsappOptIn: effectiveWhatsAppOptIn
+      })
     });
 
     if (!resp.ok) {
@@ -113,9 +138,14 @@ export async function subscribeUser(email) {
     }
 
     localStorage.setItem("fcm_token", token);
-    localStorage.setItem("subscribed_email", email || "");
+    localStorage.setItem("subscribed_whatsapp", whatsappNumber || "");
+    localStorage.setItem("whatsapp_opt_in", effectiveWhatsAppOptIn ? "true" : "false");
 
-    return { success: true, message: "Subscribed! You'll receive alerts." };
+    const successMessage = (effectiveWhatsAppOptIn && whatsappNumber)
+      ? "Subscribed! You'll receive push and WhatsApp alerts."
+      : "Subscribed! You'll receive push alerts.";
+
+    return { success: true, message: successMessage };
   } catch (err) {
     console.error("[notificationService] Subscribe failed:", err);
     return { success: false, message: err.message || "Subscription failed." };
@@ -125,36 +155,51 @@ export async function subscribeUser(email) {
 /**
  * Trigger backend notification dispatch for a published alert.
  * Called from admin.js after publish or approve.
+ * 
+ * Now uses secure Firebase ID token auth to call /api/dispatch-alert.
  *
  * @param {Object} alert - The alert object from Firebase
  */
 export async function triggerNotification(alert) {
   try {
-    const apiKey = firebaseConfig?.alertApiKey || globalThis?.DISASTER_ALERT_CONFIG?.apiKey;
-    if (!apiKey) {
+    // Get Firebase Auth instance and current user
+    const authModule = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
+    const { getAuth } = authModule;
+    const { app } = await import("../config/firebase.js");
+    
+    const auth = getAuth(app);
+    const user = auth.currentUser;
+    
+    if (!user) {
       console.warn(
-        "[notificationService] Missing API key: firebaseConfig.alertApiKey not configured. Notifications will not be dispatched."
+        "[notificationService] No authenticated user. Cannot dispatch alert. " +
+        "User must be logged in to trigger notifications."
       );
-      return { error: "API key not configured" };
+      return { error: "Not authenticated" };
     }
 
-    const resp = await fetch(`${API_BASE}/alert`, {
+    // Get Firebase ID token
+    const idToken = await user.getIdToken();
+
+    const resp = await fetch(`/api/dispatch-alert`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-api-key": apiKey
+        "Authorization": `Bearer ${idToken}`
       },
       body: JSON.stringify({
         type:        alert.type        || "Alert",
         severity:    alert.severity    || alert.level || "low",
-        description: alert.description || alert.desc  || ""
+        description: alert.description || alert.desc  || "",
+        lat:         alert.lat,
+        lng:         alert.lng
       })
     });
 
     if (!resp.ok) {
       const errBody = await resp.json().catch(() => ({}));
       throw new Error(
-        `API error ${resp.status}: ${errBody.error || resp.statusText}`
+        `Dispatch API error ${resp.status}: ${errBody.error || resp.statusText}`
       );
     }
 

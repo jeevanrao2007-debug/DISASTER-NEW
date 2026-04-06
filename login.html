@@ -237,6 +237,12 @@
 
   </div>
 
+<!-- ========================================================
+   RUNTIME CONFIG LOADER
+   Must load BEFORE any Firebase initialization
+   ======================================================== -->
+<script src="src/bootstrap.js"></script>
+
   <script type="module">
     import { app } from "./src/config/firebase.js";
     import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";

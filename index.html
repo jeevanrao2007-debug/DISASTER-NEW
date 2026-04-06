@@ -126,7 +126,7 @@ body { overflow:hidden; }
   display:block; font-size:12px; font-weight:600;
   color:#cbd5e1; margin-bottom:7px; letter-spacing:0.5px;
 }
-#subModal input[type=email] {
+#subModal input[type=tel] {
   width:100%; box-sizing:border-box;
   background: rgba(255,255,255,0.06);
   border: 1px solid rgba(99,102,241,0.35);
@@ -135,11 +135,11 @@ body { overflow:hidden; }
   margin-bottom:18px;
   outline:none; transition: border-color 0.2s, box-shadow 0.2s;
 }
-#subModal input[type=email]:focus {
+#subModal input[type=tel]:focus {
   border-color: rgba(99,102,241,0.7);
   box-shadow: 0 0 0 3px rgba(99,102,241,0.15);
 }
-#subModal input[type=email]::placeholder { color:#475569; }
+#subModal input[type=tel]::placeholder { color:#475569; }
 
 #subModal .modal-hint {
   font-size:11px; color:#475569;
@@ -261,18 +261,30 @@ body { overflow:hidden; }
     <button class="modal-close" onclick="window.closeSubscribeModal()" aria-label="Close">×</button>
     <div class="modal-icon">🔔</div>
     <h2 id="subModalTitle">Subscribe to Alerts</h2>
-    <p>Receive instant push notifications and email alerts when disasters are detected near you.</p>
+    <p>Receive instant push notifications and optional WhatsApp alerts when disasters are detected near you.</p>
 
-    <label for="subEmail">Email Address <span style="color:#64748b;font-weight:400;">(optional)</span></label>
-    <input type="email" id="subEmail" placeholder="your@email.com" autocomplete="email">
+    <label for="subWhatsapp">WhatsApp Number <span style="color:#64748b;font-weight:400;">(optional)</span></label>
+    <input type="tel" id="subWhatsapp" placeholder="+919876543210" autocomplete="tel">
+
+    <label style="display:flex;align-items:center;gap:8px;margin:0 0 18px;color:#cbd5e1;font-size:12px;font-weight:600;">
+      <input type="checkbox" id="subWhatsappOptIn" style="accent-color:#4f46e5;cursor:pointer;">
+      I consent to receive disaster alerts on WhatsApp.
+    </label>
 
     <p class="modal-hint">📍 Your browser location may be requested to send only nearby alerts.<br>
-    🔔 Push notifications require browser permission.</p>
+    🔔 Push notifications require browser permission.<br>
+    💬 WhatsApp number must use international E.164 format.</p>
 
     <button class="sub-submit-btn" id="subSubmitBtn" onclick="window.handleSubscribe()">Enable Notifications</button>
     <div class="sub-result" id="subResult"></div>
   </div>
 </div>
+
+<!-- ========================================================
+     RUNTIME CONFIG LOADER
+     Must load BEFORE any Firebase initialization
+     ======================================================== -->
+<script src="src/bootstrap.js"></script>
 
 <!-- ========================================================
      MAIN APP MODULE

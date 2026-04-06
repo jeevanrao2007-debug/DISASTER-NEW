@@ -10,6 +10,7 @@ import { showToast } from "./ui/toastModule.js";
 import { addActivity } from "./ui/activityModule.js";
 import { listenForAlerts } from "./services/alertService.js";
 import { subscribeUser, isSubscribed } from "./services/notificationService.js";
+import { normalizePhoneE164 } from "./utils/phone.js";
 
 // DOM Elements
 const sysStatus = document.getElementById("sysStatus");
@@ -142,7 +143,7 @@ if (isSubscribed()) {
 
 window.openSubscribeModal = () => {
   overlay?.classList.add("open");
-  document.getElementById("subEmail")?.focus();
+  document.getElementById("subWhatsapp")?.focus();
 };
 
 window.closeSubscribeModal = () => {
@@ -163,12 +164,25 @@ document.addEventListener("keydown", e => {
 });
 
 window.handleSubscribe = async () => {
-  const email = document.getElementById("subEmail")?.value?.trim() || "";
+  const rawWhatsappNumber = document.getElementById("subWhatsapp")?.value?.trim() || "";
+  const whatsappOptIn = Boolean(document.getElementById("subWhatsappOptIn")?.checked);
+  const normalizedWhatsappNumber = normalizePhoneE164(rawWhatsappNumber);
+
+  if (whatsappOptIn && rawWhatsappNumber && !normalizedWhatsappNumber) {
+    if (subResult) {
+      subResult.textContent = "Enter a valid WhatsApp number in E.164 format (example: +919876543210).";
+      subResult.className = "sub-result error";
+    }
+    return;
+  }
 
   if (subSubmit) { subSubmit.disabled = true; subSubmit.textContent = "⏳ Enabling…"; }
   if (subResult) { subResult.textContent = ""; subResult.className = "sub-result"; }
 
-  const { success, message } = await subscribeUser(email);
+  const { success, message } = await subscribeUser({
+    whatsappNumber: normalizedWhatsappNumber || rawWhatsappNumber,
+    whatsappOptIn
+  });
 
   if (subResult) {
     subResult.textContent = message;
@@ -178,7 +192,10 @@ window.handleSubscribe = async () => {
   if (success) {
     subBtn?.classList.add("subscribed");
     if (subBtn) subBtn.textContent = "✅ Subscribed";
-    addActivity("Push notifications enabled", "green");
+    const activityMessage = (whatsappOptIn && normalizedWhatsappNumber)
+      ? "Push and WhatsApp subscription enabled"
+      : "Push notifications enabled";
+    addActivity(activityMessage, "green");
     // Auto-close after 2.5 seconds on success
     setTimeout(() => window.closeSubscribeModal(), 2500);
   }
