@@ -10,14 +10,15 @@
    ========================================================= */
 
 import { getMessaging, getToken } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
-import { app } from "../config/firebase.js";
+import { app, firebaseConfig } from "../config/firebase.js";
 
 function resolveVapidKey() {
   const runtimeConfigKey = globalThis?.DISASTER_ALERT_CONFIG?.vapidKey;
+  const configKey = firebaseConfig?.vapidKey;
   const windowKey = globalThis?.VITE_VAPID_KEY;
   const localOverride = localStorage.getItem("vapid_key");
 
-  const vapidKey = runtimeConfigKey || windowKey || localOverride;
+  const vapidKey = runtimeConfigKey || configKey || windowKey || localOverride;
   if (!vapidKey) {
     throw new Error(
       "VAPID key not configured. Set DISASTER_ALERT_CONFIG.vapidKey, VITE_VAPID_KEY, or localStorage.vapid_key."

@@ -15,7 +15,8 @@ export const firebaseConfig = {
   projectId:         "disaster-alert-50aae",
   storageBucket:     "disaster-alert-50aae.appspot.com",
   messagingSenderId: "359144434898",
-  appId:             "1:359144434898:web:844f9278880b73291c110b"
+  appId:             "1:359144434898:web:844f9278880b73291c110b",
+  vapidKey:          "BPB4AgB1jx0U7iAjyGRW4DBe2Z5hqWXS0s-ir0jBiAUZiMWlIMXdUNtaJyyc07Q7Ye5tvkSu0L5b_3z3_MXl7qg"
 };
 
 // Guard: reuse existing app if already initialized by another module
