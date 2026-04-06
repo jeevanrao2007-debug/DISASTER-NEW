@@ -130,10 +130,10 @@ export async function subscribeUser(email) {
  */
 export async function triggerNotification(alert) {
   try {
-    const apiKey = firebaseConfig?.apiKey || globalThis?.DISASTER_ALERT_CONFIG?.apiKey;
+    const apiKey = firebaseConfig?.alertApiKey || globalThis?.DISASTER_ALERT_CONFIG?.apiKey;
     if (!apiKey) {
       console.warn(
-        "[notificationService] Missing API key: firebaseConfig.apiKey not configured. Notifications will not be dispatched."
+        "[notificationService] Missing API key: firebaseConfig.alertApiKey not configured. Notifications will not be dispatched."
       );
       return { error: "API key not configured" };
     }

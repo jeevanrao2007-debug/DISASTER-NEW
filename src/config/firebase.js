@@ -9,15 +9,15 @@ import { initializeApp, getApps, getApp }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 
 export const firebaseConfig = {
-  apiKey:            "AIzaSyCUzWxWJWRtdYy4O5GTvziphzv2XXfTIx4",
-  authDomain:        "disaster-alert-50aae.firebaseapp.com",
-  databaseURL:       "https://disaster-alert-50aae-default-rtdb.firebaseio.com",
-  projectId:         "disaster-alert-50aae",
-  storageBucket:     "disaster-alert-50aae.appspot.com",
-  messagingSenderId: "359144434898",
-  appId:             "1:359144434898:web:844f9278880b73291c110b",
-  vapidKey:          "BPB4AgB1jx0U7iAjyGRW4DBe2Z5hqWXS0s-ir0jBiAUZiMWlIMXdUNtaJyyc07Q7Ye5tvkSu0L5b_3z3_MXl7qg",
-  apiKey:            "admin_secret_key_1212"
+  apiKey:            import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain:        import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  databaseURL:       import.meta.env.VITE_FIREBASE_DATABASE_URL,
+  projectId:         import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket:     import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId:             import.meta.env.VITE_FIREBASE_APP_ID,
+  vapidKey:          import.meta.env.VITE_FIREBASE_VAPID_KEY,
+  alertApiKey:       import.meta.env.VITE_ALERT_API_KEY
 };
 
 // Guard: reuse existing app if already initialized by another module

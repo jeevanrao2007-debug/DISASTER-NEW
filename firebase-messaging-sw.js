@@ -5,13 +5,7 @@ importScripts("https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-com
 
 // To avoid hardcoding keys in public files, replace these placeholders 
 // with your actual Firebase config or inject them during deployment.
-firebase.initializeApp({
-  apiKey: "AIzaSyCUzWxWJWRtdYy4O5GTvziphzv2XXfTIx4",
-  authDomain: "disaster-alert-50aae.firebaseapp.com",
-  projectId: "disaster-alert-50aae",
-  messagingSenderId: "359144434898",
-  appId: "1:359144434898:web:844f9278880b73291c110b"
-});
+firebase.initializeApp(globalThis.FIREBASE_SW_CONFIG);
 
 const messaging = firebase.messaging();
 

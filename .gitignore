@@ -1,10 +1,18 @@
 node_modules/
 server/node_modules/
-serviceAccountKey.json
-.env
 .DS_Store
 
-# Extra safety
+# Secrets and Configuration
+.env
+.env.local
+.env.*.local
+serviceAccountKey.json
+firebase-key.json
+FIREBASE_SERVICE_ACCOUNT.json
+
+# Temporary and Logs
 *.json.bak
-server/serviceAccountKey.json
 __startup_check*.log
+dist/
+build/
+.vercel/

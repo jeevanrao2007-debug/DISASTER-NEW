@@ -54,12 +54,11 @@ During recent development audits, the system was hardened with **15 critical pat
     - Configure your **VAPID Keys** in the Firebase Messaging tab.
 
 3.  **Environment Variables (`.env`):**
-    ```properties
-    GMAIL_USER=your-email@gmail.com
-    GMAIL_APP_PASSWORD=your-app-specific-password
-    ALERT_API_KEY=your-secure-internal-key
-    FIREBASE_SERVICE_ACCOUNT_JSON=...
-    ```
+    - Copy `.env.example` to `.env`.
+    - Fill in your Firebase keys found in **Project Settings**.
+    - Generate a **[Gmail App Password](https://myaccount.google.com/apppasswords)** for the email service.
+    - Set a secure `ALERT_API_KEY` for admin authorization.
+    - **Note:** For production, add these same variables to your **Vercel Dashboard**.
 
 4.  **Deployment:**
     - Deploy to Vercel via `vercel --prod`.
