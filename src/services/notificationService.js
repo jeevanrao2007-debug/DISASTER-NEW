@@ -11,16 +11,17 @@
    ========================================================= */
 
 import { getMessaging, getToken } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
-import { app, firebaseConfig } from "../config/firebase.js";
+import { getFirebaseApp } from "../config/firebase.js";
 import { normalizePhoneE164 } from "../utils/phone.js";
+
+let _firebaseApp = null;
 
 function resolveVapidKey() {
   const runtimeConfigKey = globalThis?.DISASTER_ALERT_CONFIG?.vapidKey;
-  const configKey = firebaseConfig?.vapidKey;
   const windowKey = globalThis?.VITE_VAPID_KEY;
   const localOverride = localStorage.getItem("vapid_key");
 
-  const vapidKey = runtimeConfigKey || configKey || windowKey || localOverride;
+  const vapidKey = runtimeConfigKey || windowKey || localOverride;
   if (!vapidKey) {
     throw new Error(
       "VAPID key not configured. Set DISASTER_ALERT_CONFIG.vapidKey, VITE_VAPID_KEY, or localStorage.vapid_key."
@@ -33,8 +34,13 @@ const API_BASE = "/api"; // Vercel serverless base path
 
 /* ── FCM MESSAGING INSTANCE ─────────────────────────────── */
 let _messaging = null;
-function getMsg() {
-  if (!_messaging) _messaging = getMessaging(app);
+async function getMsg() {
+  if (!_messaging) {
+    if (!_firebaseApp) {
+      _firebaseApp = await getFirebaseApp();
+    }
+    _messaging = getMessaging(_firebaseApp);
+  }
   return _messaging;
 }
 
@@ -108,7 +114,8 @@ export async function subscribeUser(payload = {}) {
     const swReg = await ensureServiceWorker();
 
     // Step 3: Get FCM token
-    const token = await getToken(getMsg(), {
+    const messaging = await getMsg();
+    const token = await getToken(messaging, {
       vapidKey,
       serviceWorkerRegistration: swReg
     });
@@ -165,9 +172,12 @@ export async function triggerNotification(alert) {
     // Get Firebase Auth instance and current user
     const authModule = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
     const { getAuth } = authModule;
-    const { app } = await import("../config/firebase.js");
     
-    const auth = getAuth(app);
+    if (!_firebaseApp) {
+      _firebaseApp = await getFirebaseApp();
+    }
+    
+    const auth = getAuth(_firebaseApp);
     const user = auth.currentUser;
     
     if (!user) {

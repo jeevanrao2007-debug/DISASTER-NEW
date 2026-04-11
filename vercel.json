@@ -9,6 +9,21 @@
   "functions": {
     "api/alert.js": {
       "maxDuration": 10
+    },
+    "api/runtime-config.js": {
+      "maxDuration": 5
+    },
+    "api/nearby-resources.js": {
+      "maxDuration": 10
+    },
+    "api/dispatch-alert.js": {
+      "maxDuration": 15
+    },
+    "api/cron.js": {
+      "maxDuration": 30
+    },
+    "api/register.js": {
+      "maxDuration": 10
     }
   }
 }

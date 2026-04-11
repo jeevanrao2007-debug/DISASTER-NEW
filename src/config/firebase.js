@@ -46,7 +46,49 @@ function getFirebaseConfig() {
   return config;
 }
 
-export const firebaseConfig = getFirebaseConfig();
+// Wait for bootstrap.js to load config before initializing Firebase
+let firebaseConfig;
+let firebaseApp;
+let firebaseInitError = null;
 
-// Guard: reuse existing app if already initialized by another module
-export const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+const firebaseAppReady = (async function initializeFirebase() {
+  try {
+    // Wait for bootstrap.js to finish loading config
+    await window.DISASTER_ALERT_CONFIG_READY;
+    firebaseConfig = getFirebaseConfig();
+    firebaseApp = getApps().length ? getApp() : initializeApp(firebaseConfig);
+  } catch (err) {
+    firebaseInitError = err;
+    console.error("[firebase.js] Initialization failed:", err.message);
+  }
+})();
+
+export async function getFirebaseApp() {
+  // If already initialized, return immediately
+  if (firebaseApp) return firebaseApp;
+
+  // Wait for initialization to complete
+  await firebaseAppReady;
+
+  if (firebaseInitError) {
+    throw firebaseInitError;
+  }
+
+  if (!firebaseApp) {
+    throw new Error("Firebase app failed to initialize");
+  }
+
+  return firebaseApp;
+}
+
+// For backward compatibility, provide both lazy and direct access
+export const app = new Proxy({}, {
+  get: (target, prop) => {
+    if (!firebaseApp) {
+      throw new Error(
+        "Firebase app not initialized yet. Use getFirebaseApp() or wait for window.DISASTER_ALERT_CONFIG_READY"
+      );
+    }
+    return firebaseApp[prop];
+  }
+});

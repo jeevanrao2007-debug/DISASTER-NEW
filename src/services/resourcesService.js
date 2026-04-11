@@ -1,0 +1,82 @@
+/* =========================================================
+   src/services/resourcesService.js
+   Frontend service for nearby resources lookup.
+   ========================================================= */
+
+const CACHE_TTL_MS = 2 * 60 * 1000;
+const cache = new Map();
+
+function toNumber(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function cacheKey(lat, lng, radius) {
+  return `${lat.toFixed(4)}:${lng.toFixed(4)}:${radius}`;
+}
+
+export async function fetchNearbyResources({ lat, lng, radius = 5000 } = {}) {
+  const parsedLat = toNumber(lat);
+  const parsedLng = toNumber(lng);
+  const parsedRadius = toNumber(radius) || 5000;
+
+  if (parsedLat == null || parsedLng == null) {
+    return {
+      success: false,
+      places: [],
+      error: "Invalid coordinates"
+    };
+  }
+
+  const key = cacheKey(parsedLat, parsedLng, parsedRadius);
+  const cached = cache.get(key);
+
+  if (cached && Date.now() - cached.createdAt < CACHE_TTL_MS) {
+    return {
+      success: true,
+      places: cached.places,
+      cached: true
+    };
+  }
+
+  try {
+    const response = await fetch("/api/nearby-resources", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        lat: parsedLat,
+        lng: parsedLng,
+        radius: parsedRadius
+      })
+    });
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok || !data.success) {
+      return {
+        success: false,
+        places: [],
+        error: data.error || "Nearby resources unavailable"
+      };
+    }
+
+    const places = Array.isArray(data.places) ? data.places : [];
+
+    cache.set(key, {
+      createdAt: Date.now(),
+      places
+    });
+
+    return {
+      success: true,
+      places,
+      cached: Boolean(data.cached)
+    };
+  } catch (err) {
+    return {
+      success: false,
+      places: [],
+      error: "Network error while loading nearby resources"
+    };
+  }
+}

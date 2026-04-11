@@ -244,15 +244,28 @@
 <script src="src/bootstrap.js"></script>
 
   <script type="module">
-    import { app } from "./src/config/firebase.js";
+    import { getFirebaseApp } from "./src/config/firebase.js";
     import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-    const auth = getAuth(app);
+    const authReady = (async () => {
+      const app = await getFirebaseApp();
+      return getAuth(app);
+    })();
 
     /* ── LOGIN FUNCTION ─────────────────────────────────────── */
     window.login = async () => {
       const btn = document.getElementById("loginBtn");
       const status = document.getElementById("status");
+
+      let auth;
+      try {
+        auth = await authReady;
+      } catch (err) {
+        console.error("Failed to initialize Firebase auth:", err);
+        status.innerText = "⚠ System initialization failed";
+        status.style.color = "var(--critical)";
+        return;
+      }
 
       const email = document.getElementById("email").value.trim();
       const pass = document.getElementById("pass").value.trim();

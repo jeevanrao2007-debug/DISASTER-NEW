@@ -10,7 +10,8 @@
 
 import { getMessaging, onMessage }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
-import { app } from "./config/firebase.js";
+import { getFirebaseApp } from "./config/firebase.js";
+import { t } from "./i18n/languageManager.js";
 
 const NOTIFICATION_ICON_URL = "https://cdn-icons-png.flaticon.com/512/564/564619.png";
 
@@ -18,40 +19,47 @@ const NOTIFICATION_ICON_URL = "https://cdn-icons-png.flaticon.com/512/564/564619
    Do not register again here to avoid lifecycle conflicts. */
 
 /* ── FOREGROUND MESSAGE HANDLER ─────────────────────────── */
-const messaging = getMessaging(app);
+(async function initializeMessaging() {
+  try {
+    const app = await getFirebaseApp();
+    const messaging = getMessaging(app);
 
-onMessage(messaging, payload => {
-  console.log("[FCM] Foreground message received:", payload);
+    onMessage(messaging, payload => {
+      console.log("[FCM] Foreground message received:", payload);
 
-  if (!payload || !payload.notification) {
-    console.warn("[FCM] Received message without notification field. Skipping foreground handling.");
-    return;
+      if (!payload || !payload.notification) {
+        console.warn("[FCM] Received message without notification field. Skipping foreground handling.");
+        return;
+      }
+
+      const title = payload.notification?.title || `Disaster ${t("ui.alert", "Alert")}`;
+      const body  = payload.notification?.body  || "Emergency warning nearby";
+      const sev   = (payload.data?.severity || "").toLowerCase();
+
+      const type =
+        sev === "critical" ? "critical" :
+        sev === "high"     ? "warning"  : "info";
+
+      const dotColor =
+        sev === "critical" ? "red" :
+        sev === "high"     ? "yellow" : "green";
+
+      /* Use in-app toast (set by toastModule.js) when the page is visible */
+      if (typeof window.showToast === "function") {
+        window.showToast(`📡 ${title}`, body, type);
+      } else {
+        /* Fallback: native browser notification */
+        if (Notification.permission === "granted") {
+          new Notification(title, { body, icon: NOTIFICATION_ICON_URL });
+        }
+      }
+
+      /* Log to activity stream */
+      if (typeof window.addActivity === "function") {
+        window.addActivity(`${t("ui.live", "LIVE")}: <b>${title}</b>`, dotColor);
+      }
+    });
+  } catch (err) {
+    console.error("[messaging] Failed to initialize:", err);
   }
-
-  const title = payload.notification?.title || "Disaster Alert";
-  const body  = payload.notification?.body  || "Emergency warning nearby";
-  const sev   = (payload.data?.severity || "").toLowerCase();
-
-  const type =
-    sev === "critical" ? "critical" :
-    sev === "high"     ? "warning"  : "info";
-
-  const dotColor =
-    sev === "critical" ? "red" :
-    sev === "high"     ? "yellow" : "green";
-
-  /* Use in-app toast (set by toastModule.js) when the page is visible */
-  if (typeof window.showToast === "function") {
-    window.showToast(`📡 ${title}`, body, type);
-  } else {
-    /* Fallback: native browser notification */
-    if (Notification.permission === "granted") {
-      new Notification(title, { body, icon: NOTIFICATION_ICON_URL });
-    }
-  }
-
-  /* Log to activity stream */
-  if (typeof window.addActivity === "function") {
-    window.addActivity(`Broadcast received: <b>${title}</b>`, dotColor);
-  }
-});
+})();

@@ -186,21 +186,27 @@ body { overflow:hidden; }
   <div class="topbar-brand">
     <!-- [UPGRADE] Heartbeat dot -->
     <div class="heartbeat-dot" id="heartbeatDot" title="System connected"></div>
-    🌍 Public Disaster Monitoring
+    <span>🌍</span>
+    <span data-i18n="ui.publicDashboard">Public Disaster Monitoring</span>
   </div>
 
   <div class="topbar-right">
     <div class="sys-status" id="sysStatus">LIVE · 0 ALERTS</div>
 
+    <div class="lang-toggle" aria-label="Language toggle">
+      <button id="langEnBtn" class="lang-btn active" type="button">EN</button>
+      <button id="langTaBtn" class="lang-btn" type="button">TA</button>
+    </div>
+
     <div id="alarmIndicator">
       <div class="ai-blink"></div>
-      CRITICAL ALERT
+      <span data-i18n="ui.criticalActive">CRITICAL ACTIVE</span>
     </div>
 
     <!-- Subscribe to Alerts button -->
-    <button id="subscribeBtn" onclick="window.openSubscribeModal()">🔔 Subscribe</button>
+    <button id="subscribeBtn" onclick="window.openSubscribeModal()">🔔 <span data-i18n="ui.subscribe">Subscribe</span></button>
 
-    <a href="login.html">Authority Login</a>
+    <a href="login.html" data-i18n="ui.authorityLogin">Authority Login</a>
   </div>
 </div>
 
@@ -213,22 +219,22 @@ body { overflow:hidden; }
      MAP LEGEND
      ======================================================== -->
 <div class="legend">
-  <b>Severity</b>
-  <div><span class="l-low"></span>Low</div>
-  <div><span class="l-moderate"></span>Moderate</div>
-  <div><span class="l-high"></span>High</div>
-  <div><span class="l-critical"></span>Critical</div>
+  <b data-i18n="ui.severity">Severity</b>
+  <div><span class="l-low"></span><span data-i18n="severity.low">Low</span></div>
+  <div><span class="l-moderate"></span><span data-i18n="severity.moderate">Moderate</span></div>
+  <div><span class="l-high"></span><span data-i18n="severity.high">High</span></div>
+  <div><span class="l-critical"></span><span data-i18n="severity.critical">Critical</span></div>
 </div>
 
 <!-- ========================================================
      [UPGRADE] ACTIVITY STREAM PANEL
      ======================================================== -->
 <div id="activityPanel">
-  <h4>⚡ Live Activity</h4>
+  <h4>⚡ <span data-i18n="ui.live">LIVE</span></h4>
   <ul id="activityList">
     <li class="activity-item">
       <div class="ai-dot"></div>
-      <span>System online — awaiting alerts</span>
+      <span data-i18n="messages.systemOnline">System online — awaiting alerts</span>
       <span class="ai-time">now</span>
     </li>
   </ul>

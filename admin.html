@@ -130,6 +130,66 @@
     .preview-marker-icon div {
       animation: preview-pulse 1.4s ease-in-out infinite;
     }
+
+    .sim-mode-btn {
+      width: 100%;
+      background: linear-gradient(135deg, rgba(14, 116, 144, 0.42), rgba(3, 105, 161, 0.42));
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      color: #bae6fd;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+    }
+
+    .sim-mode-btn.active {
+      background: linear-gradient(135deg, rgba(22, 163, 74, 0.36), rgba(21, 128, 61, 0.36));
+      border-color: rgba(134, 239, 172, 0.45);
+      color: #dcfce7;
+      box-shadow: 0 0 16px rgba(34, 197, 94, 0.25);
+    }
+
+    .sim-controls {
+      display: none;
+      padding: 10px;
+      border-radius: 10px;
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      background: rgba(15, 23, 42, 0.55);
+      gap: 8px;
+      flex-direction: column;
+    }
+
+    .sim-controls.open {
+      display: flex;
+    }
+
+    .sim-hint {
+      margin: 0;
+      font-size: 11px;
+      color: var(--text-muted);
+      line-height: 1.45;
+    }
+
+    .sim-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .sim-count {
+      font-size: 11px;
+      color: #7dd3fc;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .sim-stop-btn {
+      background: rgba(127, 29, 29, 0.45);
+      border: 1px solid rgba(239, 68, 68, 0.35);
+      color: #fecaca;
+    }
+
+    .sim-stop-btn:hover {
+      background: rgba(185, 28, 28, 0.45);
+      box-shadow: 0 0 14px rgba(239, 68, 68, 0.25);
+    }
   </style>
 </head>
 
@@ -142,18 +202,25 @@
 
     <div class="topbar-brand">
       <div class="heartbeat-dot" id="heartbeatDot" title="System connected"></div>
-      🛡️ Authority Control Panel
+      <span>🛡️</span>
+      <span data-i18n="ui.authorityPanel">Authority Control Panel</span>
     </div>
 
     <div class="topbar-right">
-      <div class="sys-status" id="sysStatus">SECURE SESSION</div>
+      <div class="sys-status" id="sysStatus" data-i18n="ui.secureSession">SECURE SESSION</div>
+
+      <div class="lang-toggle" aria-label="Language toggle">
+        <button id="langEnBtn" class="lang-btn active" type="button">EN</button>
+        <button id="langTaBtn" class="lang-btn" type="button">TA</button>
+      </div>
+
       <div id="alarmIndicator">
         <div class="ai-blink"></div>
-        CRITICAL ACTIVE
+        <span data-i18n="ui.criticalActive">CRITICAL ACTIVE</span>
       </div>
       <button onclick="logout()"
         style="background:rgba(127,29,29,0.2);border:1px solid rgba(239,68,68,0.3);color:var(--critical);">
-        Logout
+        <span data-i18n="ui.logout">Logout</span>
       </button>
     </div>
   </div>
@@ -164,22 +231,22 @@
   <div class="panel">
 
     <!-- Manual Alert Section -->
-    <h3>📍 Manual Alert</h3>
+    <h3>📍 <span data-i18n="ui.manualAlert">Manual Alert</span></h3>
 
     <select id="type">
-      <option>Flood</option>
-      <option>Fire</option>
-      <option>Accident</option>
-      <option>Earthquake</option>
-      <option>Cyclone</option>
-      <option>Landslide</option>
+      <option value="Flood" data-i18n="alertTypes.flood">Flood</option>
+      <option value="Fire" data-i18n="alertTypes.fire">Fire</option>
+      <option value="Accident" data-i18n="alertTypes.accident">Accident</option>
+      <option value="Earthquake" data-i18n="alertTypes.earthquake">Earthquake</option>
+      <option value="Cyclone" data-i18n="alertTypes.cyclone">Cyclone</option>
+      <option value="Landslide" data-i18n="alertTypes.landslide">Landslide</option>
     </select>
 
     <select id="level">
-      <option>Low</option>
-      <option>Moderate</option>
-      <option>High</option>
-      <option>Critical</option>
+      <option value="Low" data-i18n="severity.low">Low</option>
+      <option value="Moderate" data-i18n="severity.moderate">Moderate</option>
+      <option value="High" data-i18n="severity.high">High</option>
+      <option value="Critical" data-i18n="severity.critical">Critical</option>
     </select>
 
     <input id="desc" placeholder="Short description (optional)">
@@ -188,7 +255,31 @@
     <div id="coords">Move mouse over map to pick location</div>
 
     <!-- [UPGRADE] Named publish button -->
-    <button id="publishBtn" onclick="publish()">🚨 Publish Alert</button>
+    <button id="publishBtn" onclick="publish()">🚨 <span data-i18n="ui.publishAlert">Publish Alert</span></button>
+
+    <button id="simulationModeBtn" class="sim-mode-btn" type="button">🎬 <span id="simulationModeLabel" data-i18n="ui.simulationModeOff">Simulation Mode: OFF</span></button>
+
+    <div id="simulationControls" class="sim-controls">
+      <select id="simDisasterType" aria-label="Simulation disaster type">
+        <option value="flood" data-i18n="alertTypes.flood">Flood</option>
+        <option value="earthquake" data-i18n="alertTypes.earthquake">Earthquake</option>
+        <option value="fire" data-i18n="alertTypes.fire">Fire</option>
+      </select>
+
+      <select id="simSeverity" aria-label="Simulation severity">
+        <option value="low" data-i18n="severity.low">Low</option>
+        <option value="moderate" selected data-i18n="severity.moderate">Moderate</option>
+        <option value="high" data-i18n="severity.high">High</option>
+        <option value="critical" data-i18n="severity.critical">Critical</option>
+      </select>
+
+      <div class="sim-row">
+        <button id="simStopAllBtn" type="button" class="sim-stop-btn" data-i18n="ui.stopAllSimulations">Stop All Simulations</button>
+        <span id="simActiveCount" class="sim-count">Active: 0</span>
+      </div>
+
+      <p class="sim-hint" data-i18n="ui.simulationHint">Simulation data is local only. Click map to place animated disaster waves.</p>
+    </div>
 
     <!-- [UPGRADE] Broadcast progress bar -->
     <div id="broadcastBar"></div>
@@ -199,18 +290,18 @@
 
     <!-- Pending Alerts Section -->
     <h3>
-      ⚠️ Auto-Detected
+      ⚠️ <span data-i18n="ui.autoDetected">Auto-Detected</span>
       <span id="pendingCount"></span>
     </h3>
 
     <div id="pendingBox">
-      <div style="font-size:12px;color:var(--text-dim);padding:6px 0;">No pending alerts</div>
+      <div style="font-size:12px;color:var(--text-dim);padding:6px 0;" data-i18n="ui.noPendingAlerts">No pending alerts</div>
     </div>
 
     <hr style="border-color:var(--border);margin:2px 0;">
 
     <!-- [UPGRADE] Activity Log -->
-    <h3>📋 Session Log</h3>
+    <h3>📋 <span data-i18n="ui.sessionLog">Session Log</span></h3>
     <ul id="adminActivityList">
       <li class="activity-item">
         <div class="ai-dot"></div>

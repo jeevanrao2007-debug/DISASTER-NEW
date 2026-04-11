@@ -1,7 +1,7 @@
 /* ================= IMPORTS ================= */
 
 import { getDatabase, ref, set, get, child } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
-import { app } from "./config/firebase.js";
+import { getFirebaseApp } from "./config/firebase.js";
 
 /* ================= SYSTEM CONSTANTS ================= */
 const TARGET_LAT = 13.08;
@@ -9,12 +9,21 @@ const TARGET_LNG = 80.27;
 
 /* ================= FIREBASE ================= */
 
-const db = getDatabase(app);
+let db = null;
+
+async function getDb() {
+  if (!db) {
+    const app = await getFirebaseApp();
+    db = getDatabase(app);
+  }
+  return db;
+}
 
 /* ================= DUPLICATE CHECK ================= */
 
 async function exists(id){
-  const snap = await get(child(ref(db), "pending/"+id));
+  const currentDb = await getDb();
+  const snap = await get(child(ref(currentDb), "pending/"+id));
   return snap.exists();
 }
 
@@ -47,7 +56,8 @@ async function detectEarthquake(){
       if(mag>=5.5) level="High";
       if(mag>=6.5) level="Critical";
 
-      await set(ref(db,"pending/"+id),{
+      const currentDb = await getDb();
+      await set(ref(currentDb,"pending/"+id),{
         type:"Earthquake",
         level,
         desc:`Magnitude ${mag} near ${place}`,
@@ -88,7 +98,8 @@ async function detectFlood(){
     if(rain>70) level="High";
     if(rain>110) level="Critical";
 
-    await set(ref(db,"pending/"+id),{
+    const currentDb = await getDb();
+    await set(ref(currentDb,"pending/"+id),{
       type:"Flood Risk",
       level,
       desc:`Rainfall intensity ${rain} mm/hr`,
@@ -128,7 +139,8 @@ async function detectFire(){
     if(temp>42) level="High";
     if(temp>46) level="Critical";
 
-    await set(ref(db,"pending/"+id),{
+    const currentDb = await getDb();
+    await set(ref(currentDb,"pending/"+id),{
       type:"Fire Risk",
       level,
       desc:`Surface temperature ${temp}°C`,
@@ -168,7 +180,8 @@ async function detectCyclone(){
     if(wind>75) level="High";
     if(wind>100) level="Critical";
 
-    await set(ref(db,"pending/"+id),{
+    const currentDb = await getDb();
+    await set(ref(currentDb,"pending/"+id),{
       type:"Cyclone Risk",
       level,
       desc:`Wind speed ${wind} km/h`,

@@ -4,9 +4,21 @@
    ========================================================= */
 
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { app } from "./config/firebase.js";
-import { initMap, addMarker, removeMarker } from "./ui/mapModule.js";
+import { getFirebaseApp } from "./config/firebase.js";
+import { initMap, addMarker, removeMarker, refreshMarkerPopup } from "./ui/mapModule.js";
 import { showToast } from "./ui/toastModule.js";
+import { showNearbyResourcesForAlert } from "./ui/resourcesPanel.js";
+import { createSimulationController } from "./ui/simulationModule.js";
+import {
+  initLanguage,
+  setupLanguageToggle,
+  onLanguageChange,
+  t,
+  translateAlertType,
+  translateSeverity,
+  translateDynamicText,
+  applyDocumentTranslations
+} from "./i18n/languageManager.js";
 import {
   listenForAlerts, listenForPendingAlerts, publishAlert,
   deleteLiveAlert, approvePendingAlert, rejectPendingAlert,
@@ -14,11 +26,12 @@ import {
 } from "./services/alertService.js";
 import { triggerNotification } from "./services/notificationService.js";
 
-const auth = getAuth(app);
+let auth = null;
 let map;
 let selected = null;
 let previewMarker = null;
 let markers = {};
+let simulationController = null;
 
 // DOM Elements
 const adminActivityList = document.getElementById("adminActivityList");
@@ -31,21 +44,56 @@ const broadcastBar = document.getElementById("broadcastBar");
 const pubStatusText = document.getElementById("status");
 const pendingBadge = document.getElementById("pendingCount");
 const pendingBox = document.getElementById("pendingBox");
+const simulationModeBtn = document.getElementById("simulationModeBtn");
+const simulationControls = document.getElementById("simulationControls");
+const simDisasterType = document.getElementById("simDisasterType");
+const simSeverity = document.getElementById("simSeverity");
+const simStopAllBtn = document.getElementById("simStopAllBtn");
+const simActiveCount = document.getElementById("simActiveCount");
+const simulationModeLabel = document.getElementById("simulationModeLabel");
 
 let isInitialized = false;
+let hasCriticalActive = false;
+let latestPendingAlerts = {};
+
+// Store unsubscribe functions to prevent memory leaks
+let unsubscribeAlerts = null;
+let unsubscribePendingAlerts = null;
+let unsubscribeLanguageChange = null;
+
+initLanguage();
+setupLanguageToggle();
+applyDocumentTranslations();
 
 /* ── AUTH GUARD ───────────────────────────────────────── */
-onAuthStateChanged(auth, user => {
-  if (!user) { window.location.href = "login.html"; return; }
-  document.body.style.display = "block";
-  logActivity(`Authenticated as ${user.email || "admin"}`, "green");
-  if (!isInitialized) {
-    setupInit();
-    isInitialized = true;
+(async function initializeAuth() {
+  try {
+    const app = await getFirebaseApp();
+    auth = getAuth(app);
+    
+    onAuthStateChanged(auth, async user => {
+      if (!user) { window.location.href = "login.html"; return; }
+      document.body.style.display = "block";
+      logActivity(`Authenticated as ${user.email || "admin"}`, "green");
+      if (!isInitialized) {
+        await setupInit();
+        isInitialized = true;
+      }
+    });
+  } catch (err) {
+    console.error("Failed to initialize auth:", err);
+    window.location.href = "login.html";
   }
-});
+})();
 
-window.logout = () => signOut(auth).then(() => window.location.href = "login.html");
+window.logout = () => {
+  // Clean up Firebase listeners to prevent memory leaks
+  if (typeof unsubscribeAlerts === "function") unsubscribeAlerts();
+  if (typeof unsubscribePendingAlerts === "function") unsubscribePendingAlerts();
+  if (typeof unsubscribeLanguageChange === "function") unsubscribeLanguageChange();
+  
+  signOut(auth).then(() => window.location.href = "login.html");
+};
 
 /* ── ACTIVITY LOG ─────────────────────────────────────── */
 function logActivity(text, dotClass = "") {
@@ -56,6 +104,38 @@ function logActivity(text, dotClass = "") {
   li.innerHTML = `<div class="ai-dot ${dotClass}"></div><span>${text}</span>`;
   adminActivityList.insertBefore(li, adminActivityList.firstChild);
 }
+
+function updateSessionStatusText() {
+  if (!sysStatus) return;
+  sysStatus.textContent = hasCriticalActive
+    ? `⚠ ${t("ui.criticalActive", "CRITICAL ACTIVE")}`
+    : t("ui.secureSession", "SECURE SESSION");
+}
+
+function updateSimulationModeVisuals(enabled) {
+  if (!simulationModeBtn || !simulationControls) return;
+
+  simulationModeBtn.classList.toggle("active", enabled);
+  simulationControls.classList.toggle("open", enabled);
+
+  if (simulationModeLabel) {
+    simulationModeLabel.textContent = enabled
+      ? t("ui.simulationModeOn", "Simulation Mode: ON")
+      : t("ui.simulationModeOff", "Simulation Mode: OFF");
+  }
+
+  if (simActiveCount && simulationController) {
+    simActiveCount.textContent = `${t("ui.active", "Active")}: ${simulationController.activeCount()}`;
+  }
+}
+
+unsubscribeLanguageChange = onLanguageChange(() => {
+  applyDocumentTranslations();
+  updateSessionStatusText();
+  updateSimulationModeVisuals(isSimulationModeActive());
+  renderPendingAlerts(latestPendingAlerts);
+  Object.values(markers).forEach((marker) => refreshMarkerPopup(marker));
+});
 
 /* ── BROADCAST ANIMATION ──────────────────────────────── */
 function animateBroadcast(success) {
@@ -71,7 +151,7 @@ function animateBroadcast(success) {
     if (success) {
       publishBtn.textContent = "✅ Published!";
       publishBtn.style.background = "linear-gradient(135deg,#16a34a,#15803d)";
-      pubStatusText.textContent = "Alert published & broadcast sent ✔";
+      pubStatusText.textContent = `${t("messages.alertPublished", "Alert Published")} ✔`;
       pubStatusText.style.color = "var(--low)";
     } else {
       publishBtn.textContent = "⚠ Failed";
@@ -79,7 +159,7 @@ function animateBroadcast(success) {
     }
     setTimeout(() => {
       publishBtn.disabled = false;
-      publishBtn.textContent = "🚨 Publish Alert";
+      publishBtn.textContent = `🚨 ${t("ui.publishAlert", "Publish Alert")}`;
       publishBtn.style.background = "";
       broadcastBar.style.width = "0%";
     }, 2200);
@@ -87,21 +167,73 @@ function animateBroadcast(success) {
 }
 
 /* ── SETUP ────────────────────────────────────────────── */
-function setupInit() {
+async function setupInit() {
   map = initMap('map', [13.0827, 80.2707], 11);
+  simulationController = createSimulationController(map, {
+    onCreate: ({ type, severity }) => {
+      logActivity(`Simulation placed: ${type} (${severity})`, "yellow");
+    },
+    onStopAll: () => {
+      logActivity("All simulations stopped", "red");
+    },
+    onCountChange: (count) => {
+      if (simActiveCount) simActiveCount.textContent = `${t("ui.active", "Active")}: ${count}`;
+    }
+  });
+  setupSimulationControls();
+  updateSimulationModeVisuals(false);
+  updateSessionStatusText();
   setupMapEvents();
-  setupAlertsListener();
-  setupPendingListener();
+  await setupAlertsListener();
+  await setupPendingListener();
+}
+
+function isSimulationModeActive() {
+  return Boolean(simulationController?.isEnabled());
+}
+
+function setSimulationMode(enabled) {
+  if (!simulationController || !simulationModeBtn || !simulationControls) return;
+
+  simulationController.setEnabled(enabled);
+  updateSimulationModeVisuals(enabled);
+
+  if (enabled) {
+    if (previewMarker) {
+      previewMarker.remove();
+      previewMarker = null;
+    }
+    if (coordsText) coordsText.innerText = "Simulation mode active: click map to place simulation";
+    showToast("Simulation", t("messages.simulationEnabled", "Simulation mode enabled. Map clicks create local demo effects."), "info");
+    logActivity("Simulation mode enabled", "yellow");
+    return;
+  }
+
+  if (coordsText) coordsText.innerText = "Move mouse over map to pick location";
+  showToast("Simulation", t("messages.simulationDisabled", "Simulation mode disabled. Real alert pinning restored."), "success");
+  logActivity("Simulation mode disabled", "green");
+}
+
+function setupSimulationControls() {
+  if (!simulationModeBtn || !simulationControls || !simulationController) return;
+
+  simulationModeBtn.addEventListener("click", () => {
+    const next = !isSimulationModeActive();
+    setSimulationMode(next);
+  });
+
+  simStopAllBtn?.addEventListener("click", () => {
+    simulationController.stopAllSimulations();
+    showToast("Simulation", t("messages.simulationStopped", "All active simulations have been stopped."), "warning");
+  });
 }
 
 function setupMapEvents() {
-  // Event delegation for popup buttons
-  map.on("popupopen", function(e) {
-    const popup = e.popup;
-    const popupEl = popup._contentNode;
-    if (!popupEl) return;
-
-    popupEl.addEventListener("click", async (evt) => {
+  // BUGFIX: Use single delegated listener on map container instead of attaching 
+  // new listeners to each popup (which caused duplicate event handlers).
+  const mapContainer = document.getElementById("map");
+  if (mapContainer) {
+    mapContainer.addEventListener("click", async (evt) => {
       const btn = evt.target.closest("button[data-action]");
       if (!btn) return;
 
@@ -113,10 +245,21 @@ function setupMapEvents() {
       } else if (action === "delete") {
         await window.deleteAlert(alertId);
       }
-    });
-  });
+    }, true); // Use capture phase to ensure we catch all clicks
+  }
 
   map.on("mousemove", e => {
+    if (isSimulationModeActive()) {
+      if (coordsText) {
+        coordsText.innerText = `SIM ${e.latlng.lat.toFixed(5)} | ${e.latlng.lng.toFixed(5)}`;
+      }
+      if (previewMarker) {
+        previewMarker.remove();
+        previewMarker = null;
+      }
+      return;
+    }
+
     if (coordsText) {
       coordsText.innerText = `Lat ${e.latlng.lat.toFixed(5)} | Lng ${e.latlng.lng.toFixed(5)}`;
     }
@@ -139,6 +282,22 @@ function setupMapEvents() {
   });
 
   map.on("click", e => {
+    if (isSimulationModeActive()) {
+      const type = simDisasterType?.value || "flood";
+      const severity = simSeverity?.value || "moderate";
+
+      simulationController.createSimulation({
+        latlng: e.latlng,
+        type,
+        severity
+      });
+
+      if (coordsText) {
+        coordsText.innerText = `SIM placed at ${e.latlng.lat.toFixed(5)} , ${e.latlng.lng.toFixed(5)}`;
+      }
+      return;
+    }
+
     selected = e.latlng;
     if (previewMarker) previewMarker.remove();
     const icon = L.divIcon({
@@ -159,9 +318,38 @@ function setupMapEvents() {
   });
 }
 
+function buildAdminPopupContent(alert, id, severity) {
+  const expiryStr = alert.expiresAt
+    ? new Date(alert.expiresAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+    : "N/A";
+
+  const alertType = translateAlertType(alert.type || "Alert");
+  const severityLabel = translateSeverity(severity);
+  const descriptionText = translateDynamicText(alert.description || alert.desc || "");
+
+  return `
+    <div style="min-width:170px;font-family:'Inter',sans-serif;">
+      <b style="font-size:14px">${alertType}</b><br>
+      <small style="color:#94a3b8">${severityLabel} · ${alert.createdBy || "system"}</small><br>
+      <small style="color:#64748b">Expires: ${expiryStr}</small>
+      ${descriptionText ? `<br><small style="color:#cbd5e1">${descriptionText}</small>` : ""}
+      <br><br>
+      <button data-action="resolve" data-alert-id="${id}"
+        style="margin-right:6px;padding:4px 10px;background:#16a34a;color:#fff;
+               border:none;border-radius:6px;cursor:pointer;font-size:12px">
+        ✔ ${t("ui.resolve", "Resolve")}
+      </button>
+      <button data-action="delete" data-alert-id="${id}"
+        style="padding:4px 10px;background:#dc2626;color:#fff;
+               border:none;border-radius:6px;cursor:pointer;font-size:12px">
+        🗑 ${t("ui.delete", "Delete")}
+      </button>
+    </div>`;
+}
+
 /* ── ALERTS LISTENER ──────────────────────────────────── */
-function setupAlertsListener() {
-  listenForAlerts(data => {
+async function setupAlertsListener() {
+  unsubscribeAlerts = await listenForAlerts(data => {
     const currentIds = new Set(Object.keys(data));
     let hasCritical = false;
 
@@ -179,45 +367,31 @@ function setupAlertsListener() {
 
       if (markers[id]) {
         if (severity.toLowerCase() === "critical") hasCritical = true;
+        refreshMarkerPopup(markers[id]);
         return;
       }
 
-      // Build custom popup with Resolve + Delete buttons and expiry info
-      const expiryStr = a.expiresAt
-        ? new Date(a.expiresAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-        : "N/A";
-
-      const popupContent = `
-        <div style="min-width:170px;font-family:'Inter',sans-serif;">
-          <b style="font-size:14px">${a.type || "Alert"}</b><br>
-          <small style="color:#94a3b8">${severity} · ${a.createdBy || "system"}</small><br>
-          <small style="color:#64748b">Expires: ${expiryStr}</small>
-          ${a.description || a.desc ? `<br><small style="color:#cbd5e1">${a.description || a.desc}</small>` : ""}
-          <br><br>
-          <button data-action="resolve" data-alert-id="${id}"
-            style="margin-right:6px;padding:4px 10px;background:#16a34a;color:#fff;
-                   border:none;border-radius:6px;cursor:pointer;font-size:12px">
-            ✔ Resolve
-          </button>
-          <button data-action="delete" data-alert-id="${id}"
-            style="padding:4px 10px;background:#dc2626;color:#fff;
-                   border:none;border-radius:6px;cursor:pointer;font-size:12px">
-            🗑 Delete
-          </button>
-        </div>`;
-
-      markers[id] = addMarker([a.lat, a.lng], severity, a, id, true, popupContent);
+      markers[id] = addMarker(
+        [a.lat, a.lng],
+        severity,
+        a,
+        id,
+        true,
+        () => buildAdminPopupContent(a, id, severity),
+        () => showNearbyResourcesForAlert({ id, ...a, severity })
+      );
       if (severity.toLowerCase() === "critical") hasCritical = true;
     });
+
+    hasCriticalActive = hasCritical;
+    updateSessionStatusText();
 
     if (hasCritical) {
       if (alarmInd) alarmInd.classList.add("active");
       if (flash) flash.classList.add("active");
-      if (sysStatus) sysStatus.textContent = "⚠ CRITICAL ACTIVE";
     } else {
       if (alarmInd) alarmInd.classList.remove("active");
       if (flash) flash.classList.remove("active");
-      if (sysStatus) sysStatus.textContent = "SECURE SESSION";
     }
   });
 }
@@ -227,7 +401,11 @@ window.resolveAlert = async (id) => {
   if (confirm("Mark this alert as Resolved and remove it?")) {
     await resolveAlert(id);
     logActivity("Alert resolved & removed", "green");
-    showToast("Alert Resolved", "Alert has been resolved and removed.", "success");
+    showToast(
+      t("messages.alertResolved", "Alert Resolved"),
+      t("messages.alertResolvedDesc", "Alert has been resolved and removed."),
+      "success"
+    );
   }
 };
 
@@ -235,13 +413,21 @@ window.deleteAlert = async (id) => {
   if (confirm("Remove alert from database?")) {
     await deleteLiveAlert(id);
     logActivity("Alert deleted", "red");
-    showToast("Alert Removed", "Alert deleted from database.", "warning");
+    showToast(
+      t("messages.alertRemoved", "Alert Removed"),
+      t("messages.alertRemovedDesc", "Alert deleted from database."),
+      "warning"
+    );
   }
 };
 
 window.publish = async () => {
   if (!selected) {
-    showToast("No Location", "Click on the map to select a location first.", "warning");
+    showToast(
+      t("messages.noLocation", "No Location"),
+      t("messages.clickMapFirst", "Click on the map to select a location first."),
+      "warning"
+    );
     return;
   }
 
@@ -274,13 +460,23 @@ window.publish = async () => {
     document.getElementById("desc").value = "";
     if (coordsText) coordsText.innerText = "Move mouse over map to pick location";
 
-    logActivity(`${typeVal} (${levelVal}) published`, levelVal === "Critical" ? "red" : "green");
-    showToast("Alert Published", `${typeVal} — ${levelVal} broadcast to all users.`, levelVal === "Critical" ? "critical" : "success");
+    const translatedType = translateAlertType(typeVal);
+    const translatedSeverity = translateSeverity(levelVal);
+    logActivity(`${translatedType} (${translatedSeverity}) published`, levelVal === "Critical" ? "red" : "green");
+    showToast(
+      t("messages.alertPublished", "Alert Published"),
+      `${translatedType} — ${translatedSeverity} broadcast to all users.`,
+      levelVal === "Critical" ? "critical" : "success"
+    );
 
   } catch (e) {
     animateBroadcast(false);
     console.error("[admin.publish] Error:", e);
-    showToast("Publish Failed", "Database write error — try again.", "warning");
+    showToast(
+      t("messages.publishFailed", "Publish Failed"),
+      t("messages.dbWriteError", "Database write error — try again."),
+      "warning"
+    );
   }
 };
 
@@ -294,45 +490,52 @@ function colorHex(sev) {
   return "var(--blue)";
 }
 
-function setupPendingListener() {
-  listenForPendingAlerts(data => {
-    if (!pendingBox || !pendingBadge) return;
+async function setupPendingListener() {
+  unsubscribePendingAlerts = await listenForPendingAlerts(data => {
+    latestPendingAlerts = data || {};
+    renderPendingAlerts(latestPendingAlerts);
+  });
+}
 
-    if (!data || Object.keys(data).length === 0) {
-      pendingBox.innerHTML = `<div style="font-size:12px;color:var(--text-dim);padding:6px 0;">No pending alerts</div>`;
-      pendingBadge.style.display = "none";
-      return;
-    }
+function renderPendingAlerts(data) {
+  if (!pendingBox || !pendingBadge) return;
 
-    const entries = Object.entries(data);
-    pendingBadge.textContent = entries.length;
-    pendingBadge.style.display = "inline-flex";
-    pendingBox.innerHTML = "";
+  if (!data || Object.keys(data).length === 0) {
+    pendingBox.innerHTML = `<div style="font-size:12px;color:var(--text-dim);padding:6px 0;">${t("ui.noPendingAlerts", "No pending alerts")}</div>`;
+    pendingBadge.style.display = "none";
+    return;
+  }
 
-    entries.forEach(([id, a]) => {
-      const severity = a.level || a.severity || "Low";
-      const displaySev = severity.charAt(0).toUpperCase() + severity.slice(1);
-      const c = colorHex(severity);
+  const entries = Object.entries(data);
+  pendingBadge.textContent = entries.length;
+  pendingBadge.style.display = "inline-flex";
+  pendingBox.innerHTML = "";
 
-      const card = document.createElement("div");
-      card.className = "pending-card";
-      card.setAttribute("data-level", displaySev);
-      card.id = "pcard-" + id;
+  entries.forEach(([id, a]) => {
+    const severity = a.level || a.severity || "Low";
+    const displaySev = translateSeverity(severity);
+    const severityToken = String(severity);
+    const severityCssLevel = severityToken.charAt(0).toUpperCase() + severityToken.slice(1).toLowerCase();
+    const c = colorHex(severity);
 
-      card.innerHTML = `
-        <div class="pending-card-title" style="color:${c}">${a.type} <small style="color:var(--text-muted);font-weight:400;">· ${displaySev}</small></div>
-        <div class="pending-card-meta">
-          ${a.desc || a.description || ""}<br>
-          🔎 ${a.source || "Auto-detected"} · ${a.confidence || "--"}% confidence<br>
-          🕐 ${a.detectedAt || new Date(a.createdAt).toLocaleString()}
-        </div>
-        <div class="pending-card-actions">
-          <button class="btn-approve" onclick="window.approve('${id}')">✔ Approve</button>
-          <button class="btn-reject"  onclick="window.reject('${id}')">✕ Reject</button>
-        </div>
-      `;
-      pendingBox.appendChild(card);
-    });
+    const card = document.createElement("div");
+    card.className = "pending-card";
+    card.setAttribute("data-level", severityCssLevel);
+    card.id = "pcard-" + id;
+
+    card.innerHTML = `
+      <div class="pending-card-title" style="color:${c}">${translateAlertType(a.type)} <small style="color:var(--text-muted);font-weight:400;">· ${displaySev}</small></div>
+      <div class="pending-card-meta">
+        ${translateDynamicText(a.desc || a.description || "")}<br>
+        🔎 ${a.source || t("ui.autoDetected", "Auto-Detected")} · ${a.confidence || "--"}% confidence<br>
+        🕐 ${a.detectedAt || new Date(a.createdAt).toLocaleString()}
+      </div>
+      <div class="pending-card-actions">
+        <button class="btn-approve" onclick="window.approve('${id}')">✔ ${t("ui.approve", "Approve")}</button>
+        <button class="btn-reject"  onclick="window.reject('${id}')">✕ ${t("ui.reject", "Reject")}</button>
+      </div>
+    `;
+    pendingBox.appendChild(card);
   });
 }
 
@@ -347,12 +550,20 @@ window.approve = async (id) => {
     try {
       const approvedAlert = await approvePendingAlert(id);
       if (!approvedAlert) {
-        showToast("Approval Failed", "Alert not found in pending list.", "warning");
+        showToast(
+          t("messages.approvalFailed", "Approval Failed"),
+          t("messages.alertNotFoundPending", "Alert not found in pending list."),
+          "warning"
+        );
         return;
       }
       const severity = approvedAlert.level || approvedAlert.severity;
-      logActivity(`Approved: ${approvedAlert.type} — ${severity}`, "green");
-      showToast("Alert Approved", `${approvedAlert.type} moved to live alerts & broadcast sent.`, "success");
+      logActivity(`Approved: ${translateAlertType(approvedAlert.type)} — ${translateSeverity(severity)}`, "green");
+      showToast(
+        t("messages.alertApproved", "Alert Approved"),
+        `${translateAlertType(approvedAlert.type)} moved to live alerts & broadcast sent.`,
+        "success"
+      );
       await triggerNotification(approvedAlert);
     } catch (err) {
       console.error("[admin.approve] Error:", err);
@@ -371,7 +582,11 @@ window.reject = async (id) => {
     try {
       await rejectPendingAlert(id);
       logActivity("Alert rejected", "red");
-      showToast("Alert Rejected", "Pending alert dismissed.", "warning");
+      showToast(
+        t("messages.alertRejected", "Alert Rejected"),
+        t("messages.pendingDismissed", "Pending alert dismissed."),
+        "warning"
+      );
     } catch (err) {
       console.error("[admin.reject] Error:", err);
       showToast("Rejection Error", "Failed to reject alert. Check console.", "warning");

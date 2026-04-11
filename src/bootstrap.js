@@ -12,7 +12,7 @@
    <script type="module" src="src/index.js"></script>
    ========================================================= */
 
-(async function initializeRuntimeConfig() {
+window.DISASTER_ALERT_CONFIG_READY = (async function initializeRuntimeConfig() {
   try {
     // Fetch runtime config from the public API endpoint
     const response = await fetch("/api/runtime-config", {
@@ -28,7 +28,7 @@
     }
 
     const data = await response.json();
-    
+
     if (!data.success || !data.config) {
       throw new Error("[bootstrap] Invalid runtime config response structure");
     }
@@ -54,15 +54,10 @@
     // Set global config object
     window.DISASTER_ALERT_CONFIG = data.config;
     console.info("[bootstrap] Runtime config loaded successfully");
-
-    // Mark config as ready so dependent modules can proceed
-    window.DISASTER_ALERT_CONFIG_READY = Promise.resolve(window.DISASTER_ALERT_CONFIG);
+    return data.config;
   } catch (err) {
     console.error("[bootstrap] Fatal error:", err.message);
-    
-    // Create a rejected promise so modules know something went wrong
-    window.DISASTER_ALERT_CONFIG_READY = Promise.reject(err);
-    
+
     // Show user-visible error
     const errorDiv = document.createElement("div");
     errorDiv.style.cssText = `
@@ -74,5 +69,6 @@
     `;
     errorDiv.textContent = `⚠ Configuration initialization failed: ${err.message}. Please refresh the page.`;
     document.body.insertBefore(errorDiv, document.body.firstChild);
+    throw err;
   }
 })();

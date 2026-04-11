@@ -43,6 +43,10 @@ app.all("/api/cron", async (req, res) => {
   return runLocalHandler("./cron.js", "/api/cron", req, res);
 });
 
+app.all("/api/nearby-resources", async (req, res) => {
+  return runLocalHandler("./nearby-resources.js", "/api/nearby-resources", req, res);
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`\n================================`);

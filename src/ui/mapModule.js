@@ -4,6 +4,8 @@
    animated marker creation.
    ========================================================= */
 
+import { t, translateAlertType, translateSeverity, translateDynamicText } from "../i18n/languageManager.js";
+
 function color(severity) {
   if (severity === "low") return "#22c55e";
   if (severity === "moderate") return "#facc15";
@@ -13,6 +15,31 @@ function color(severity) {
 }
 
 let mapInstance;
+
+function formatTime(data = {}) {
+  return typeof data.createdAt === "number"
+    ? new Date(data.createdAt).toLocaleString()
+    : data.createdAt || data.time || data.detectedAt || "";
+}
+
+function buildDefaultPopup({ data, id, isAdmin, sev, colorHex }) {
+  const infoText = translateDynamicText(data.description || data.desc || "");
+
+  let popupHtml = `
+    <div style="min-width:180px;font-family:'Inter',sans-serif;">
+      <b style="font-size:15px;color:${colorHex}">${translateAlertType(data.type || "Alert")}</b><br>
+      ${t("ui.severity", "Severity")}: <b style="color:${colorHex}">${translateSeverity(sev)}</b><br>
+      ${infoText ? `${t("ui.info", "Info")}: ${infoText}<br>` : ""}
+      <small style="color:#64748b">${formatTime(data)}</small>
+  `;
+
+  if (isAdmin) {
+    popupHtml += `<br><br><button data-action="delete" data-alert-id="${id}" style="padding:4px 10px;background:#dc2626;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px">🗑 Remove Alert</button>`;
+  }
+
+  popupHtml += "</div>";
+  return popupHtml;
+}
 
 export function initMap(containerId = "map", center = [13.0827, 80.2707], zoom = 12) {
   mapInstance = L.map(containerId, { zoomControl: true }).setView(center, zoom);
@@ -36,8 +63,17 @@ export function getMap() {
  * @param {string}  id           - Alert ID
  * @param {boolean} isAdmin      - Show admin controls in default popup
  * @param {string|null} customPopup - If provided, overrides the default popup HTML
+ * @param {Function|null} onMarkerSelect - Optional callback triggered on marker click
  */
-export function addMarker(latlng, severity, data, id, isAdmin = false, customPopup = null) {
+export function addMarker(
+  latlng,
+  severity,
+  data,
+  id,
+  isAdmin = false,
+  customPopup = null,
+  onMarkerSelect = null
+) {
   if (!mapInstance) throw new Error("Map not initialized. Call initMap first.");
 
   const sev = severity ? severity.toLowerCase() : "low";
@@ -96,32 +132,36 @@ export function addMarker(latlng, severity, data, id, isAdmin = false, customPop
   });
 
   const m = L.marker(latlng, { icon }).addTo(mapInstance);
-  const displaySev = sev.charAt(0).toUpperCase() + sev.slice(1);
 
-  let popupHtml;
+  const popupResolver = typeof customPopup === "function"
+    ? customPopup
+    : () => (customPopup || buildDefaultPopup({ data, id, isAdmin, sev, colorHex: c }));
 
-  if (customPopup) {
-    popupHtml = customPopup;
-  } else {
-    popupHtml = `
-      <div style="min-width:180px;font-family:'Inter',sans-serif;">
-        <b style="font-size:15px;color:${c}">${data.type || 'Alert'}</b><br>
-        Severity: <b style="color:${c}">${displaySev}</b><br>
-        ${data.description || data.desc ? `Info: ${data.description || data.desc}<br>` : ""}
-        <small style="color:#64748b">${
-          typeof data.createdAt === "number"
-            ? new Date(data.createdAt).toLocaleString()
-            : data.createdAt || data.time || data.detectedAt || ""
-        }</small>
-    `;
-    if (isAdmin) {
-      popupHtml += `<br><br><button data-action="delete" data-alert-id="${id}" style="padding:4px 10px;background:#dc2626;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px">🗑 Remove Alert</button>`;
-    }
-    popupHtml += `</div>`;
+  m.__popupResolver = popupResolver;
+  m.bindPopup(popupResolver());
+
+  if (typeof onMarkerSelect === "function") {
+    m.on("click", () => {
+      try {
+        onMarkerSelect({
+          id,
+          data,
+          latlng,
+          severity: sev,
+          marker: m
+        });
+      } catch (err) {
+        console.warn("[mapModule] Marker select callback failed:", err);
+      }
+    });
   }
 
-  m.bindPopup(popupHtml);
   return m;
+}
+
+export function refreshMarkerPopup(marker) {
+  if (!marker || typeof marker.__popupResolver !== "function") return;
+  marker.setPopupContent(marker.__popupResolver());
 }
 
 export function removeMarker(marker) {

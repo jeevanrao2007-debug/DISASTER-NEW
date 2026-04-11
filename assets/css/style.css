@@ -150,6 +150,35 @@ html, body {
   gap:12px;
 }
 
+.lang-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px;
+  border-radius: 999px;
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  background: rgba(15, 23, 42, 0.65);
+}
+
+.lang-toggle .lang-btn {
+  min-width: 36px;
+  height: 26px;
+  border-radius: 999px;
+  padding: 0 10px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+}
+
+.lang-toggle .lang-btn.active {
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.38), rgba(14, 116, 144, 0.38));
+  color: #e0f2fe;
+  box-shadow: 0 0 14px rgba(14, 165, 233, 0.2);
+}
+
 /* [UPGRADE] System status chip */
 .sys-status {
   display:flex;
@@ -826,3 +855,188 @@ button:active { transform:scale(.96); }
 
 /* [UPGRADE] Selection color */
 ::selection { background:rgba(59,130,246,0.3); color:var(--text-primary); }
+
+/* -- Nearby Resources Panel -------------------------------- */
+.nearby-panel {
+  position: fixed;
+  top: 76px;
+  right: 16px;
+  width: 340px;
+  max-height: calc(100vh - 96px);
+  background: var(--bg-panel);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-lg);
+  z-index: 1400;
+  transform: translateX(112%);
+  transition: transform var(--dur-base) ease;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.nearby-panel.open {
+  transform: translateX(0);
+}
+
+.nearby-panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 14px 14px 10px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.nearby-panel-header h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+
+.nearby-panel-header p {
+  margin: 4px 0 0;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.nearby-close {
+  padding: 2px 8px;
+  line-height: 1;
+  min-width: 30px;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  box-shadow: none;
+}
+
+.nearby-close:hover {
+  color: var(--text-primary);
+  border-color: var(--border-bright);
+  background: var(--bg-hover);
+  transform: none;
+}
+
+.nearby-panel-body {
+  padding: 10px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.nearby-placeholder,
+.nearby-state {
+  color: var(--text-muted);
+  font-size: 12px;
+  background: rgba(15, 23, 42, 0.5);
+  border: 1px dashed var(--border);
+  border-radius: var(--r-sm);
+  padding: 12px;
+}
+
+.nearby-state strong {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--text-primary);
+}
+
+.nearby-state p {
+  margin: 0;
+}
+
+.nearby-state.loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.nearby-spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid rgba(148, 163, 184, 0.25);
+  border-top-color: var(--blue);
+  animation: nearby-spin .7s linear infinite;
+}
+
+@keyframes nearby-spin {
+  to { transform: rotate(360deg); }
+}
+
+.nearby-card {
+  display: flex;
+  gap: 10px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 10px;
+}
+
+.nearby-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(30, 41, 59, 0.65);
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.nearby-content {
+  min-width: 0;
+  width: 100%;
+}
+
+.nearby-top-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.nearby-top-row strong {
+  font-size: 13px;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nearby-distance {
+  font-size: 11px;
+  color: var(--blue);
+  white-space: nowrap;
+}
+
+.nearby-type {
+  font-size: 11px;
+  margin-top: 2px;
+  color: var(--text-muted);
+}
+
+.nearby-vicinity {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-top: 3px;
+}
+
+@media (max-width: 900px) {
+  .nearby-panel {
+    top: auto;
+    left: 12px;
+    right: 12px;
+    width: auto;
+    bottom: 12px;
+    max-height: 48vh;
+    transform: translateY(112%);
+  }
+
+  .nearby-panel.open {
+    transform: translateY(0);
+  }
+}
