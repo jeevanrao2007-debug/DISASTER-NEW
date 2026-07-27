@@ -33,8 +33,19 @@ function buildDefaultPopup({ data, id, isAdmin, sev, colorHex }) {
       <small style="color:#64748b">${formatTime(data)}</small>
   `;
 
+  // AI Advisor button — available for all users
+  const aiData = JSON.stringify({
+    type: data.type || "Disaster",
+    severity: sev,
+    desc: data.desc || data.description || "",
+    lat: data.lat,
+    lng: data.lng
+  }).replace(/"/g, "&quot;");
+
+  popupHtml += `<br><button class="popup-ai-btn" onclick='window._aiRequestAdvice && window._aiRequestAdvice(JSON.parse(this.dataset.alert))' data-alert="${aiData}">✦ Ask AI Safety Advisor</button>`;
+
   if (isAdmin) {
-    popupHtml += `<br><br><button data-action="delete" data-alert-id="${id}" style="padding:4px 10px;background:#dc2626;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px">🗑 Remove Alert</button>`;
+    popupHtml += `<br><button data-action="delete" data-alert-id="${id}" style="padding:4px 10px;background:#dc2626;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px">🗑 Remove Alert</button>`;
   }
 
   popupHtml += "</div>";

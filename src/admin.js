@@ -8,7 +8,6 @@ import { getFirebaseApp } from "./config/firebase.js";
 import { initMap, addMarker, removeMarker, refreshMarkerPopup } from "./ui/mapModule.js";
 import { showToast } from "./ui/toastModule.js";
 import { showNearbyResourcesForAlert } from "./ui/resourcesPanel.js";
-import { createSimulationController } from "./ui/simulationModule.js";
 import {
   initLanguage,
   setupLanguageToggle,
@@ -31,7 +30,6 @@ let map;
 let selected = null;
 let previewMarker = null;
 let markers = {};
-let simulationController = null;
 
 // DOM Elements
 const adminActivityList = document.getElementById("adminActivityList");
@@ -44,13 +42,6 @@ const broadcastBar = document.getElementById("broadcastBar");
 const pubStatusText = document.getElementById("status");
 const pendingBadge = document.getElementById("pendingCount");
 const pendingBox = document.getElementById("pendingBox");
-const simulationModeBtn = document.getElementById("simulationModeBtn");
-const simulationControls = document.getElementById("simulationControls");
-const simDisasterType = document.getElementById("simDisasterType");
-const simSeverity = document.getElementById("simSeverity");
-const simStopAllBtn = document.getElementById("simStopAllBtn");
-const simActiveCount = document.getElementById("simActiveCount");
-const simulationModeLabel = document.getElementById("simulationModeLabel");
 
 let isInitialized = false;
 let hasCriticalActive = false;
@@ -112,27 +103,9 @@ function updateSessionStatusText() {
     : t("ui.secureSession", "SECURE SESSION");
 }
 
-function updateSimulationModeVisuals(enabled) {
-  if (!simulationModeBtn || !simulationControls) return;
-
-  simulationModeBtn.classList.toggle("active", enabled);
-  simulationControls.classList.toggle("open", enabled);
-
-  if (simulationModeLabel) {
-    simulationModeLabel.textContent = enabled
-      ? t("ui.simulationModeOn", "Simulation Mode: ON")
-      : t("ui.simulationModeOff", "Simulation Mode: OFF");
-  }
-
-  if (simActiveCount && simulationController) {
-    simActiveCount.textContent = `${t("ui.active", "Active")}: ${simulationController.activeCount()}`;
-  }
-}
-
 unsubscribeLanguageChange = onLanguageChange(() => {
   applyDocumentTranslations();
   updateSessionStatusText();
-  updateSimulationModeVisuals(isSimulationModeActive());
   renderPendingAlerts(latestPendingAlerts);
   Object.values(markers).forEach((marker) => refreshMarkerPopup(marker));
 });
@@ -169,63 +142,10 @@ function animateBroadcast(success) {
 /* ── SETUP ────────────────────────────────────────────── */
 async function setupInit() {
   map = initMap('map', [13.0827, 80.2707], 11);
-  simulationController = createSimulationController(map, {
-    onCreate: ({ type, severity }) => {
-      logActivity(`Simulation placed: ${type} (${severity})`, "yellow");
-    },
-    onStopAll: () => {
-      logActivity("All simulations stopped", "red");
-    },
-    onCountChange: (count) => {
-      if (simActiveCount) simActiveCount.textContent = `${t("ui.active", "Active")}: ${count}`;
-    }
-  });
-  setupSimulationControls();
-  updateSimulationModeVisuals(false);
   updateSessionStatusText();
   setupMapEvents();
   await setupAlertsListener();
   await setupPendingListener();
-}
-
-function isSimulationModeActive() {
-  return Boolean(simulationController?.isEnabled());
-}
-
-function setSimulationMode(enabled) {
-  if (!simulationController || !simulationModeBtn || !simulationControls) return;
-
-  simulationController.setEnabled(enabled);
-  updateSimulationModeVisuals(enabled);
-
-  if (enabled) {
-    if (previewMarker) {
-      previewMarker.remove();
-      previewMarker = null;
-    }
-    if (coordsText) coordsText.innerText = "Simulation mode active: click map to place simulation";
-    showToast("Simulation", t("messages.simulationEnabled", "Simulation mode enabled. Map clicks create local demo effects."), "info");
-    logActivity("Simulation mode enabled", "yellow");
-    return;
-  }
-
-  if (coordsText) coordsText.innerText = "Move mouse over map to pick location";
-  showToast("Simulation", t("messages.simulationDisabled", "Simulation mode disabled. Real alert pinning restored."), "success");
-  logActivity("Simulation mode disabled", "green");
-}
-
-function setupSimulationControls() {
-  if (!simulationModeBtn || !simulationControls || !simulationController) return;
-
-  simulationModeBtn.addEventListener("click", () => {
-    const next = !isSimulationModeActive();
-    setSimulationMode(next);
-  });
-
-  simStopAllBtn?.addEventListener("click", () => {
-    simulationController.stopAllSimulations();
-    showToast("Simulation", t("messages.simulationStopped", "All active simulations have been stopped."), "warning");
-  });
 }
 
 function setupMapEvents() {
@@ -249,17 +169,6 @@ function setupMapEvents() {
   }
 
   map.on("mousemove", e => {
-    if (isSimulationModeActive()) {
-      if (coordsText) {
-        coordsText.innerText = `SIM ${e.latlng.lat.toFixed(5)} | ${e.latlng.lng.toFixed(5)}`;
-      }
-      if (previewMarker) {
-        previewMarker.remove();
-        previewMarker = null;
-      }
-      return;
-    }
-
     if (coordsText) {
       coordsText.innerText = `Lat ${e.latlng.lat.toFixed(5)} | Lng ${e.latlng.lng.toFixed(5)}`;
     }
@@ -282,22 +191,6 @@ function setupMapEvents() {
   });
 
   map.on("click", e => {
-    if (isSimulationModeActive()) {
-      const type = simDisasterType?.value || "flood";
-      const severity = simSeverity?.value || "moderate";
-
-      simulationController.createSimulation({
-        latlng: e.latlng,
-        type,
-        severity
-      });
-
-      if (coordsText) {
-        coordsText.innerText = `SIM placed at ${e.latlng.lat.toFixed(5)} , ${e.latlng.lng.toFixed(5)}`;
-      }
-      return;
-    }
-
     selected = e.latlng;
     if (previewMarker) previewMarker.remove();
     const icon = L.divIcon({

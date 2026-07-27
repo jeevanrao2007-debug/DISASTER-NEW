@@ -4,17 +4,24 @@
   "type": "module",
   "description": "Real-Time Disaster Monitoring and Alert System",
   "scripts": {
-    "dev": "node api/serve-local.js",
-    "start": "node api/serve-local.js"
+    "dev": "firebase emulators:start --only hosting,functions",
+    "start": "node server.js",
+    "start:emulator": "firebase emulators:start --only hosting,functions",
+    "deploy": "firebase deploy --only hosting,functions"
   },
-  "dependencies": {
-    "cors": "^2.8.6",
-    "dotenv": "^16.6.1",
-    "express": "^4.22.1",
-    "firebase-admin": "^12.7.0",
-    "twilio": "^5.13.1"
+  "devDependencies": {
+    "firebase-tools": "^14.0.0"
   },
   "engines": {
     "node": ">=18.x"
+  },
+  "dependencies": {
+    "cors": "^2.8.6",
+    "express": "^4.21.0",
+    "firebase-admin": "^14.2.0",
+    "nodemailer": "^9.0.3"
+  },
+  "overrides": {
+    "jose": "5.9.6"
   }
 }

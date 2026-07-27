@@ -1,8 +1,3 @@
-/* =========================================================
-   src/services/resourcesService.js
-   Frontend service for nearby resources lookup.
-   ========================================================= */
-
 const CACHE_TTL_MS = 2 * 60 * 1000;
 const cache = new Map();
 
@@ -13,6 +8,15 @@ function toNumber(value) {
 
 function cacheKey(lat, lng, radius) {
   return `${lat.toFixed(4)}:${lng.toFixed(4)}:${radius}`;
+}
+
+function getNearbyResourcesUrl() {
+  const url = globalThis?.DISASTER_ALERT_FUNCTIONS?.nearbyResources;
+  if (!url) {
+    throw new Error("Nearby resources function URL is not configured");
+  }
+
+  return url;
 }
 
 export async function fetchNearbyResources({ lat, lng, radius = 5000 } = {}) {
@@ -40,7 +44,7 @@ export async function fetchNearbyResources({ lat, lng, radius = 5000 } = {}) {
   }
 
   try {
-    const response = await fetch("/api/nearby-resources", {
+    const response = await fetch(getNearbyResourcesUrl(), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -72,7 +76,7 @@ export async function fetchNearbyResources({ lat, lng, radius = 5000 } = {}) {
       places,
       cached: Boolean(data.cached)
     };
-  } catch (err) {
+  } catch (error) {
     return {
       success: false,
       places: [],

@@ -1,12 +1,8 @@
-/* =========================================================
-   src/services/alertService.js
-   Handles fetching, deleting, and publishing alerts from
-   Firebase Realtime Database.
-   ========================================================= */
-
 import { getDatabase, ref, onValue, remove, push, set, get }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 import { getFirebaseApp } from "../config/firebase.js";
+
+const EXPIRY_MS = 24 * 60 * 60 * 1000;
 
 let db = null;
 
@@ -18,94 +14,103 @@ async function getDb() {
   return db;
 }
 
-const EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
+function normalizeSeverity(value) {
+  const normalized = String(value || "moderate").trim().toLowerCase();
+  return ["low", "moderate", "high", "critical"].includes(normalized)
+    ? normalized
+    : "moderate";
+}
 
-/**
- * Listen for ACTIVE alerts only.
- * Legacy alerts with no status field are also shown.
- */
+function capitalize(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (!normalized) return "";
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+}
+
+function normalizeAlertRecord(alert = {}, fallbackCreatedAt = Date.now()) {
+  const severity = normalizeSeverity(alert.severity || alert.level);
+  const level = capitalize(alert.level || severity) || "Moderate";
+  const createdAt = Number.isFinite(Number(alert.createdAt))
+    ? Number(alert.createdAt)
+    : fallbackCreatedAt;
+  const expiresAt = Number.isFinite(Number(alert.expiresAt))
+    ? Number(alert.expiresAt)
+    : createdAt + EXPIRY_MS;
+
+  return {
+    ...alert,
+    severity,
+    level,
+    description: String(alert.description || alert.desc || "").trim(),
+    desc: String(alert.desc || alert.description || "").trim(),
+    createdAt,
+    expiresAt,
+    status: alert.status || "Active"
+  };
+}
+
 export async function listenForAlerts(callback) {
   const currentDb = await getDb();
   const alertsRef = ref(currentDb, "alerts");
   return onValue(alertsRef, (snap) => {
     const all = snap.val() || {};
+    const now = Date.now();
     const active = Object.fromEntries(
-      Object.entries(all).filter(([, a]) =>
-        !a.status || a.status === "Active"
-      )
+      Object.entries(all)
+        .map(([id, alert]) => [id, normalizeAlertRecord(alert)])
+        .filter(([, alert]) =>
+          (!alert.status || alert.status === "Active") &&
+          (!alert.expiresAt || alert.expiresAt > now)
+        )
     );
+
     callback(active);
   });
 }
 
-/**
- * Listen for live updates to the "pending" collection.
- */
 export async function listenForPendingAlerts(callback) {
   const currentDb = await getDb();
   const pendingRef = ref(currentDb, "pending");
   return onValue(pendingRef, (snap) => {
-    callback(snap.val() || {});
+    const pending = snap.val() || {};
+    callback(
+      Object.fromEntries(
+        Object.entries(pending).map(([id, alert]) => [id, normalizeAlertRecord(alert)])
+      )
+    );
   });
 }
 
-/**
- * Publish a new alert with full Phase 4 schema.
- * Stamps status, createdAt, and expiresAt automatically.
- */
 export async function publishAlert(alertData) {
   const currentDb = await getDb();
   const alertsRef = ref(currentDb, "alerts");
   const now = Date.now();
-  return push(alertsRef, {
-    ...alertData,
-    status: "Active",
-    createdAt: alertData.createdAt || now,
-    expiresAt: now + EXPIRY_MS,
-  });
+  return push(alertsRef, normalizeAlertRecord(alertData, now));
 }
 
-/**
- * Delete a live alert (hard delete).
- */
 export async function deleteLiveAlert(id) {
   const currentDb = await getDb();
-  return remove(ref(currentDb, "alerts/" + id));
+  return remove(ref(currentDb, `alerts/${id}`));
 }
 
-/**
- * Approve a pending alert — moves it to live alerts with full schema.
- */
 export async function approvePendingAlert(id) {
   const currentDb = await getDb();
-  const snap = await get(ref(currentDb, "pending/" + id));
+  const pendingRef = ref(currentDb, `pending/${id}`);
+  const snap = await get(pendingRef);
   if (!snap.exists()) return null;
 
-  const now = Date.now();
-  const alertData = {
-    ...snap.val(),
-    status: "Active",
-    createdAt: snap.val().createdAt || now,
-    expiresAt: now + EXPIRY_MS,
-  };
-
-  await set(ref(currentDb, "alerts/" + id), alertData);
-  await remove(ref(currentDb, "pending/" + id));
-  return alertData;
+  const normalized = normalizeAlertRecord(snap.val(), Date.now());
+  await set(ref(currentDb, `alerts/${id}`), normalized);
+  await remove(pendingRef);
+  return normalized;
 }
 
-/**
- * Reject a pending alert (hard delete from pending).
- */
 export async function rejectPendingAlert(id) {
   const currentDb = await getDb();
-  return remove(ref(currentDb, "pending/" + id));
+  return remove(ref(currentDb, `pending/${id}`));
 }
 
-/**
- * Resolve a live alert — hard delete from DB.
- */
 export async function resolveAlert(id) {
   const currentDb = await getDb();
-  return remove(ref(currentDb, "alerts/" + id));
+  return remove(ref(currentDb, `alerts/${id}`));
 }

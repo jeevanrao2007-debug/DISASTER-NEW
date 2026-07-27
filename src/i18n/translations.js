@@ -23,10 +23,6 @@ export const translations = {
       noPendingAlerts: "No pending alerts",
       secureSession: "SECURE SESSION",
       criticalActive: "CRITICAL ACTIVE",
-      simulationModeOn: "Simulation Mode: ON",
-      simulationModeOff: "Simulation Mode: OFF",
-      simulationHint: "Simulation data is local only. Click map to place animated disaster waves.",
-      stopAllSimulations: "Stop All Simulations",
       active: "Active",
       nearbyHelp: "Nearby Help",
       nearbySelectPrompt: "Select an alert marker",
@@ -73,9 +69,6 @@ export const translations = {
       alertApproved: "Alert Approved",
       alertRejected: "Alert Rejected",
       pendingDismissed: "Pending alert dismissed.",
-      simulationEnabled: "Simulation mode enabled. Map clicks create local demo effects.",
-      simulationDisabled: "Simulation mode disabled. Real alert pinning restored.",
-      simulationStopped: "All active simulations have been stopped.",
       liveCount: "LIVE · {count} ALERT{suffix}"
     }
   },
@@ -103,10 +96,6 @@ export const translations = {
       noPendingAlerts: "நிலுவையில் எச்சரிக்கை இல்லை",
       secureSession: "பாதுகாப்பான அமர்வு",
       criticalActive: "கடுமையான நிலை செயலில்",
-      simulationModeOn: "சிமுலேஷன் நிலை: இயக்கு",
-      simulationModeOff: "சிமுலேஷன் நிலை: முடக்கு",
-      simulationHint: "சிமுலேஷன் தரவு உள்ளகமாக மட்டுமே சேமிக்கப்படும். வரைபடத்தில் சொடுக்கி காட்சியை உருவாக்கவும்.",
-      stopAllSimulations: "அனைத்து சிமுலேஷன்களையும் நிறுத்து",
       active: "செயலில்",
       nearbyHelp: "அருகிலுள்ள உதவி",
       nearbySelectPrompt: "ஒரு எச்சரிக்கை மார்க்கரைத் தேர்ந்தெடுக்கவும்",
@@ -153,9 +142,6 @@ export const translations = {
       alertApproved: "எச்சரிக்கை ஒப்புதல் பெற்றது",
       alertRejected: "எச்சரிக்கை நிராகரிக்கப்பட்டது",
       pendingDismissed: "நிலுவை எச்சரிக்கை நிராகரிக்கப்பட்டது.",
-      simulationEnabled: "சிமுலேஷன் இயங்குகிறது. வரைபடத்தில் சொடுக்கினால் காட்சி உருவாகும்.",
-      simulationDisabled: "சிமுலேஷன் நிறுத்தப்பட்டது. உண்மை எச்சரிக்கை முறை மீண்டும் செயலில்.",
-      simulationStopped: "செயலில் உள்ள அனைத்து சிமுலேஷன்களும் நிறுத்தப்பட்டன.",
       liveCount: "நேரடி · {count} எச்சரிக்கைகள்"
     }
   }
