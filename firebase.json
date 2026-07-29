@@ -1,7 +1,4 @@
 {
-  "functions": {
-    "source": "functions"
-  },
   "hosting": {
     "public": ".",
     "ignore": [
@@ -9,9 +6,14 @@
       ".firebaserc",
       "**/.*",
       "**/node_modules/**",
-      "functions/**",
-      "api/**"
+      "server.js",
+      "helpers/**",
+      "render.yaml",
+      "README.md",
+      "package.json",
+      "package-lock.json"
     ],
     "headers": []
   }
 }
+

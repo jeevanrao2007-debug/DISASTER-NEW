@@ -8,6 +8,40 @@ import { haversineKm } from "./helpers/geo.js";
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// ---------------------------------------------------------------------------
+// Nodemailer transporter — created once at module level so it is reused by
+// both /dispatchAlert and /health/email.  Password sanitization (stripping
+// spaces) and the IPv4 dns.lookup override are critical fixes that must stay.
+// ---------------------------------------------------------------------------
+const _gmailUser = (process.env.GMAIL_USER || "").trim();
+const _gmailPass = (process.env.GMAIL_APP_PASSWORD || "").trim().replace(/\s+/g, "");
+
+const transporter = nodemailer.createTransport({
+  host: "smtp.gmail.com",
+  port: 587,
+  secure: false,
+  auth: {
+    user: _gmailUser,
+    pass: _gmailPass
+  },
+  // Force IPv4 — avoids ETIMEDOUT on dual-stack hosts (e.g. Render) that
+  // attempt an IPv6 connection to Gmail's SMTP and hang.
+  lookup: (hostname, options, callback) => {
+    dns.lookup(hostname, { family: 4, all: false }, callback);
+  }
+});
+
+// Verify SMTP connectivity once at startup so Render's deploy logs
+// immediately show whether credentials are working — catches mistakes
+// before any subscriber tries to receive an alert.
+transporter.verify((error, success) => {
+  if (error) {
+    console.error("❌ Nodemailer SMTP connection failed:", error.message || error);
+  } else {
+    console.log("✅ Nodemailer SMTP ready to send emails");
+  }
+});
+
 // Middleware
 app.use(cors());
 app.use(express.json());
@@ -140,29 +174,47 @@ app.post("/dispatchAlert", async (req, res) => {
       return;
     }
 
-    const rawPassword = (process.env.GMAIL_APP_PASSWORD || "").trim();
-    const cleanPassword = rawPassword.replace(/\s+/g, "");
-    const gmailUser = (process.env.GMAIL_USER || "").trim();
+    // Transporter is created at module level (see top of file) — no need to
+    // recreate it per request.  We just read the module-level _gmailUser here.
+    const gmailUser = _gmailUser;
 
-    const transporter = nodemailer.createTransport({
-      host: "smtp.gmail.com",
-      port: 587,
-      secure: false,
-      auth: {
-        user: gmailUser,
-        pass: cleanPassword
-      },
-      lookup: (hostname, options, callback) => {
-        dns.lookup(hostname, { family: 4, all: false }, callback);
+    // Validate each recipient address before attempting to send — a malformed
+    // entry in the DB (e.g. accidental whitespace or partial save) should be
+    // skipped and logged rather than crashing the whole batch.
+    const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const validRecipients = [];
+    const invalidRecipients = [];
+    for (const email of recipients) {
+      if (EMAIL_RE.test(email)) {
+        validRecipients.push(email);
+      } else {
+        invalidRecipients.push(email);
       }
-    });
+    }
+
+    if (invalidRecipients.length > 0) {
+      console.warn("[dispatchAlert] Skipping malformed recipient addresses:", invalidRecipients);
+    }
+
+    if (validRecipients.length === 0) {
+      res.status(200).json({
+        success: true,
+        dispatchedBy: decodedToken.email || decodedToken.uid || "unknown",
+        alert,
+        message: "No valid subscriber addresses to email.",
+        sent: 0,
+        failed: 0,
+        skipped: invalidRecipients.length
+      });
+      return;
+    }
 
     const emailSubject = `🚨 ${alert.type} Alert`;
     const emailBody = `Disaster Alert\n\nType:\n${alert.type}\n\nSeverity:\n${alert.level}\n\nLocation:\n${alert.location}\n\nDescription:\n${alert.description}\n\nStay safe.`;
 
-    console.log("[dispatchAlert] Sending emails to", recipients.length, "recipients...");
+    console.log("[dispatchAlert] Sending emails to", validRecipients.length, "valid recipients...");
     const settled = await Promise.allSettled(
-      recipients.map((email) =>
+      validRecipients.map((email) =>
         transporter.sendMail({
           from: gmailUser,
           to: email,
@@ -181,21 +233,24 @@ app.post("/dispatchAlert", async (req, res) => {
         sent++;
       } else {
         failed++;
-        errors.push({ email: recipients[idx], error: result.reason?.message || String(result.reason) });
+        // Log the real error message — never swallow SMTP failures silently.
+        const errMsg = result.reason?.message || String(result.reason);
+        console.error(`[dispatchAlert] Failed to send to ${validRecipients[idx]}:`, errMsg);
+        errors.push({ email: validRecipients[idx], error: errMsg });
       }
     });
 
-    console.log(`[dispatchAlert] Email results: sent=${sent}, failed=${failed}`);
-    if (errors.length > 0) {
-      console.error("[dispatchAlert] Email errors:", JSON.stringify(errors));
-    }
+    console.log(`[dispatchAlert] Email results: sent=${sent}, failed=${failed}, skipped=${invalidRecipients.length}`);
 
+    // Return 502 if every attempted delivery failed — this surfaces SMTP
+    // credential errors clearly instead of masking them as a 200.
     if (sent === 0 && failed > 0) {
       res.status(502).json({
         success: false,
         error: `Failed to deliver emails: ${errors[0]?.error || "SMTP failure"}`,
         sent,
         failed,
+        skipped: invalidRecipients.length,
         errors
       });
       return;
@@ -207,6 +262,7 @@ app.post("/dispatchAlert", async (req, res) => {
       alert,
       sent,
       failed,
+      skipped: invalidRecipients.length,
       errors: errors.length > 0 ? errors : undefined
     });
   } catch (error) {
@@ -643,6 +699,49 @@ app.post("/detector", async (req, res) => {
     res.status(500).json({
       success: false,
       error: error.message || "Failed to check earthquake feed"
+    });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// GET /health/email
+// On-demand SMTP connectivity check — call this after deploying to Render
+// to confirm GMAIL_USER / GMAIL_APP_PASSWORD are correctly set in the
+// dashboard without needing to trigger a real subscription + alert cycle.
+// Protected by CRON_SECRET so it isn't publicly accessible.
+// ---------------------------------------------------------------------------
+app.get("/health/email", async (req, res) => {
+  const authHeader = (req.headers["authorization"] || "").trim();
+  const cronSecret = (process.env.CRON_SECRET || "").trim();
+
+  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
+    res.status(401).json({ success: false, error: "Unauthorized" });
+    return;
+  }
+
+  try {
+    await new Promise((resolve, reject) => {
+      transporter.verify((error, success) => {
+        if (error) {
+          reject(error);
+        } else {
+          resolve(success);
+        }
+      });
+    });
+
+    console.log("[health/email] SMTP verify OK");
+    res.status(200).json({
+      success: true,
+      message: "✅ Nodemailer SMTP connection verified",
+      gmailUser: _gmailUser || "(not set)"
+    });
+  } catch (error) {
+    console.error("[health/email] SMTP verify failed:", error.message || error);
+    res.status(502).json({
+      success: false,
+      error: `SMTP connection failed: ${error.message || String(error)}`,
+      gmailUser: _gmailUser || "(not set)"
     });
   }
 });
