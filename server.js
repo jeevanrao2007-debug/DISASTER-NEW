@@ -1,9 +1,6 @@
-import dns from "node:dns";
-dns.setDefaultResultOrder("ipv4first");
-
 import express from "express";
 import cors from "cors";
-import nodemailer from "nodemailer";
+import { Resend } from "resend";
 import { getAdminDb, verifyFirebaseAuthToken } from "./helpers/firebaseAdmin.js";
 import { haversineKm } from "./helpers/geo.js";
 
@@ -11,39 +8,10 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // ---------------------------------------------------------------------------
-// Nodemailer transporter — created once at module level so it is reused by
-// both /dispatchAlert and /health/email.  Password sanitization (stripping
-// spaces) and the IPv4 dns.lookup override are critical fixes that must stay.
+// Resend HTTP Email Client — replacing Nodemailer SMTP to bypass Render port 587 block
 // ---------------------------------------------------------------------------
-const _gmailUser = (process.env.GMAIL_USER || "").trim();
-const _gmailPass = (process.env.GMAIL_APP_PASSWORD || "").trim().replace(/\s+/g, "");
-
-const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-  port: 587,
-  secure: false,
-  family: 4,
-  auth: {
-    user: _gmailUser,
-    pass: _gmailPass
-  },
-  // Force IPv4 — avoids ETIMEDOUT on dual-stack hosts (e.g. Render) that
-  // attempt an IPv6 connection to Gmail's SMTP and hang.
-  lookup: (hostname, options, callback) => {
-    dns.lookup(hostname, { family: 4, all: false }, callback);
-  }
-});
-
-// Verify SMTP connectivity once at startup so Render's deploy logs
-// immediately show whether credentials are working — catches mistakes
-// before any subscriber tries to receive an alert.
-transporter.verify((error, success) => {
-  if (error) {
-    console.error("❌ Nodemailer SMTP connection failed:", error.message || error);
-  } else {
-    console.log("✅ Nodemailer SMTP ready to send emails");
-  }
-});
+const resend = new Resend(process.env.RESEND_API_KEY);
+const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "Disaster Alerts <onboarding@resend.dev>";
 
 // Middleware
 app.use(cors());
@@ -177,10 +145,6 @@ app.post("/dispatchAlert", async (req, res) => {
       return;
     }
 
-    // Transporter is created at module level (see top of file) — no need to
-    // recreate it per request.  We just read the module-level _gmailUser here.
-    const gmailUser = _gmailUser;
-
     // Validate each recipient address before attempting to send — a malformed
     // entry in the DB (e.g. accidental whitespace or partial save) should be
     // skipped and logged rather than crashing the whole batch.
@@ -212,17 +176,29 @@ app.post("/dispatchAlert", async (req, res) => {
       return;
     }
 
+    const fromAddress = RESEND_FROM_EMAIL;
     const emailSubject = `🚨 ${alert.type} Alert`;
     const emailBody = `Disaster Alert\n\nType:\n${alert.type}\n\nSeverity:\n${alert.level}\n\nLocation:\n${alert.location}\n\nDescription:\n${alert.description}\n\nStay safe.`;
+    const emailHtml = `
+      <div style="font-family: sans-serif; line-height: 1.6; color: #111; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #d97706; margin-bottom: 8px;">🚨 ${alert.type} Alert</h2>
+        <p><strong>Severity:</strong> ${alert.level}</p>
+        <p><strong>Location:</strong> ${alert.location}</p>
+        <p><strong>Description:</strong> ${alert.description}</p>
+        <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;" />
+        <p style="font-size: 0.9em; color: #6b7280;">Stay safe,<br>Disaster Alert System</p>
+      </div>
+    `;
 
-    console.log("[dispatchAlert] Sending emails to", validRecipients.length, "valid recipients...");
+    console.log("[dispatchAlert] Sending emails via Resend HTTP API to", validRecipients.length, "valid recipients...");
     const settled = await Promise.allSettled(
       validRecipients.map((email) =>
-        transporter.sendMail({
-          from: gmailUser,
+        resend.emails.send({
+          from: fromAddress,
           to: email,
           subject: emailSubject,
-          text: emailBody
+          text: emailBody,
+          html: emailHtml
         })
       )
     );
@@ -232,25 +208,24 @@ app.post("/dispatchAlert", async (req, res) => {
     const errors = [];
 
     settled.forEach((result, idx) => {
-      if (result.status === "fulfilled") {
+      if (result.status === "fulfilled" && !result.value?.error) {
         sent++;
       } else {
         failed++;
-        // Log the real error message — never swallow SMTP failures silently.
-        const errMsg = result.reason?.message || String(result.reason);
+        const errMsg = result.status === "rejected"
+          ? (result.reason?.message || String(result.reason))
+          : (result.value?.error?.message || JSON.stringify(result.value?.error));
         console.error(`[dispatchAlert] Failed to send to ${validRecipients[idx]}:`, errMsg);
         errors.push({ email: validRecipients[idx], error: errMsg });
       }
     });
 
-    console.log(`[dispatchAlert] Email results: sent=${sent}, failed=${failed}, skipped=${invalidRecipients.length}`);
+    console.log(`[dispatchAlert] Resend email results: sent=${sent}, failed=${failed}, skipped=${invalidRecipients.length}`);
 
-    // Return 502 if every attempted delivery failed — this surfaces SMTP
-    // credential errors clearly instead of masking them as a 200.
     if (sent === 0 && failed > 0) {
       res.status(502).json({
         success: false,
-        error: `Failed to deliver emails: ${errors[0]?.error || "SMTP failure"}`,
+        error: `Failed to deliver emails via Resend: ${errors[0]?.error || "API failure"}`,
         sent,
         failed,
         skipped: invalidRecipients.length,
@@ -708,9 +683,8 @@ app.post("/detector", async (req, res) => {
 
 // ---------------------------------------------------------------------------
 // GET /health/email
-// On-demand SMTP connectivity check — call this after deploying to Render
-// to confirm GMAIL_USER / GMAIL_APP_PASSWORD are correctly set in the
-// dashboard without needing to trigger a real subscription + alert cycle.
+// On-demand Resend API key connectivity check — call this after deploying to Render
+// to confirm RESEND_API_KEY is correctly set in the dashboard.
 // Protected by CRON_SECRET so it isn't publicly accessible.
 // ---------------------------------------------------------------------------
 app.get("/health/email", async (req, res) => {
@@ -722,29 +696,32 @@ app.get("/health/email", async (req, res) => {
     return;
   }
 
-  try {
-    await new Promise((resolve, reject) => {
-      transporter.verify((error, success) => {
-        if (error) {
-          reject(error);
-        } else {
-          resolve(success);
-        }
-      });
+  const apiKey = (process.env.RESEND_API_KEY || "").trim();
+  if (!apiKey) {
+    res.status(500).json({
+      success: false,
+      error: "RESEND_API_KEY is missing from environment variables"
     });
+    return;
+  }
 
-    console.log("[health/email] SMTP verify OK");
+  try {
+    const { data, error } = await resend.apiKeys.list();
+    if (error) {
+      throw new Error(error.message || JSON.stringify(error));
+    }
+
+    console.log("[health/email] Resend API key verified OK");
     res.status(200).json({
       success: true,
-      message: "✅ Nodemailer SMTP connection verified",
-      gmailUser: _gmailUser || "(not set)"
+      message: "✅ Resend API key verified successfully",
+      keyPrefix: apiKey.substring(0, 5) + "..."
     });
   } catch (error) {
-    console.error("[health/email] SMTP verify failed:", error.message || error);
+    console.error("[health/email] Resend verification failed:", error.message || error);
     res.status(502).json({
       success: false,
-      error: `SMTP connection failed: ${error.message || String(error)}`,
-      gmailUser: _gmailUser || "(not set)"
+      error: `Resend API verification failed: ${error.message || String(error)}`
     });
   }
 });
