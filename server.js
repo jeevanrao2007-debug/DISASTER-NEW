@@ -1,7 +1,9 @@
+import dns from "node:dns";
+dns.setDefaultResultOrder("ipv4first");
+
 import express from "express";
 import cors from "cors";
 import nodemailer from "nodemailer";
-import dns from "dns";
 import { getAdminDb, verifyFirebaseAuthToken } from "./helpers/firebaseAdmin.js";
 import { haversineKm } from "./helpers/geo.js";
 
@@ -20,6 +22,7 @@ const transporter = nodemailer.createTransport({
   host: "smtp.gmail.com",
   port: 587,
   secure: false,
+  family: 4,
   auth: {
     user: _gmailUser,
     pass: _gmailPass
