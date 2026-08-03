@@ -700,6 +700,11 @@ app.get("/health/email", async (req, res) => {
   }
 
   const apiKey = (process.env.BREVO_API_KEY || "").trim();
+  const senderEmail = (process.env.BREVO_SENDER_EMAIL || "").trim();
+
+  console.log("[health/email] BREVO_API_KEY present:", !!apiKey, "length:", apiKey.length, "prefix:", apiKey ? apiKey.substring(0, 8) + "..." : "N/A");
+  console.log("[health/email] BREVO_SENDER_EMAIL present:", !!senderEmail, "email:", senderEmail);
+
   if (!apiKey) {
     res.status(500).json({
       success: false,
@@ -708,7 +713,6 @@ app.get("/health/email", async (req, res) => {
     return;
   }
 
-  const senderEmail = (process.env.BREVO_SENDER_EMAIL || "").trim();
   if (!senderEmail) {
     res.status(500).json({
       success: false,
@@ -732,10 +736,20 @@ app.get("/health/email", async (req, res) => {
       keyPrefix: apiKey.substring(0, 8) + "..."
     });
   } catch (error) {
-    console.error("[health/email] Brevo verification failed:", error.message || error);
+    const brevoErrorBody = error.response?.body || error.body || null;
+    const statusCode = error.response?.statusCode || error.statusCode || null;
+    const detailMsg = brevoErrorBody?.message || brevoErrorBody?.code || error.message || String(error);
+
+    console.error("[health/email] Brevo verification failed!");
+    console.error("[health/email] Status Code:", statusCode);
+    console.error("[health/email] Error Message:", error.message);
+    console.error("[health/email] Response Body:", JSON.stringify(brevoErrorBody));
+
     res.status(502).json({
       success: false,
-      error: `Brevo API verification failed: ${error.message || String(error)}`
+      error: `Brevo API verification failed: ${detailMsg}`,
+      details: brevoErrorBody || undefined,
+      statusCode
     });
   }
 });
