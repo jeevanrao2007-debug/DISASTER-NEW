@@ -182,18 +182,150 @@ app.post("/dispatchAlert", async (req, res) => {
       return;
     }
 
-    const emailSubject = `🚨 ${alert.type} Alert`;
-    const emailBody = `Disaster Alert\n\nType:\n${alert.type}\n\nSeverity:\n${alert.level}\n\nLocation:\n${alert.location}\n\nDescription:\n${alert.description}\n\nStay safe.`;
-    const emailHtml = `
-      <div style="font-family: sans-serif; line-height: 1.6; color: #111; max-width: 600px; margin: 0 auto;">
-        <h2 style="color: #d97706; margin-bottom: 8px;">🚨 ${alert.type} Alert</h2>
-        <p><strong>Severity:</strong> ${alert.level}</p>
-        <p><strong>Location:</strong> ${alert.location}</p>
-        <p><strong>Description:</strong> ${alert.description}</p>
-        <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;" />
-        <p style="font-size: 0.9em; color: #6b7280;">Stay safe,<br>Disaster Alert System</p>
-      </div>
-    `;
+    const emailSubject = `🚨 ${alert.type} Alert — ${alert.level} Severity`;
+
+    // Severity-based color palette (inline for email client compatibility)
+    const severityKey = (alert.severity || alert.level || "").toLowerCase();
+    const palette = severityKey.includes("critical")
+      ? { accent: "#b91c1c", accentLight: "#fef2f2", accentBorder: "#fca5a5", badge: "#dc2626", badgeText: "#ffffff", icon: "🔴" }
+      : severityKey.includes("high")
+      ? { accent: "#c2410c", accentLight: "#fff7ed", accentBorder: "#fdba74", badge: "#ea580c", badgeText: "#ffffff", icon: "🟠" }
+      : severityKey.includes("moderate") || severityKey.includes("medium")
+      ? { accent: "#b45309", accentLight: "#fffbeb", accentBorder: "#fcd34d", badge: "#d97706", badgeText: "#ffffff", icon: "🟡" }
+      : { accent: "#1d4ed8", accentLight: "#eff6ff", accentBorder: "#93c5fd", badge: "#2563eb", badgeText: "#ffffff", icon: "🔵" };
+
+    const DASHBOARD_URL = "https://disaster-alert-50aae.web.app";
+
+    const emailBody = [
+      "DISASTER ALERT SYSTEM",
+      "=".repeat(40),
+      "",
+      `⚠️  ${alert.type.toUpperCase()} ALERT`,
+      "",
+      `Severity   : ${alert.level}`,
+      `Location   : ${alert.location}`,
+      `Description: ${alert.description}`,
+      "",
+      "─".repeat(40),
+      `View on Dashboard: ${DASHBOARD_URL}`,
+      "─".repeat(40),
+      "",
+      "Stay safe. Take immediate precautions.",
+      "",
+      "You are receiving this because you subscribed to Disaster Alert System notifications.",
+    ].join("\n");
+
+    const emailHtml = `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background-color:#f3f4f6;font-family:'Segoe UI',Arial,sans-serif;">
+
+  <!-- Outer wrapper -->
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f3f4f6;padding:32px 16px;">
+    <tr><td align="center">
+
+      <!-- Email card -->
+      <table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.10);">
+
+        <!-- ── BRAND HEADER ── -->
+        <tr>
+          <td style="background:linear-gradient(135deg,#1e293b 0%,#0f172a 100%);padding:20px 32px;text-align:center;">
+            <p style="margin:0;font-size:13px;letter-spacing:2px;color:#94a3b8;text-transform:uppercase;font-weight:600;">Disaster Alert System</p>
+            <p style="margin:4px 0 0;font-size:11px;color:#475569;">Real-Time Emergency Monitoring</p>
+          </td>
+        </tr>
+
+        <!-- ── ALERT BANNER ── -->
+        <tr>
+          <td style="background:${palette.accent};padding:28px 32px 24px;text-align:center;">
+            <p style="margin:0 0 8px;font-size:48px;line-height:1;">${palette.icon}</p>
+            <h1 style="margin:0 0 6px;font-size:26px;font-weight:800;color:#ffffff;letter-spacing:-0.5px;">
+              ${alert.type} Alert
+            </h1>
+            <span style="display:inline-block;background:rgba(255,255,255,0.2);color:#ffffff;font-size:13px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;padding:4px 14px;border-radius:20px;border:1px solid rgba(255,255,255,0.35);">
+              ${alert.level} Severity
+            </span>
+          </td>
+        </tr>
+
+        <!-- ── ALERT DETAILS ── -->
+        <tr>
+          <td style="padding:28px 32px 8px;">
+
+            <!-- Severity row -->
+            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:16px;background:${palette.accentLight};border-left:4px solid ${palette.accent};border-radius:0 8px 8px 0;">
+              <tr>
+                <td style="padding:14px 18px;">
+                  <p style="margin:0 0 2px;font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:${palette.accent};">Severity Level</p>
+                  <p style="margin:0;font-size:17px;font-weight:700;color:#1e293b;">${alert.level}</p>
+                </td>
+              </tr>
+            </table>
+
+            <!-- Location row -->
+            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:16px;background:#f8fafc;border-left:4px solid #64748b;border-radius:0 8px 8px 0;">
+              <tr>
+                <td style="padding:14px 18px;">
+                  <p style="margin:0 0 2px;font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:#475569;">📍 Location</p>
+                  <p style="margin:0;font-size:17px;font-weight:600;color:#1e293b;">${alert.location}</p>
+                </td>
+              </tr>
+            </table>
+
+            <!-- Description row -->
+            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:24px;background:#f8fafc;border-left:4px solid #64748b;border-radius:0 8px 8px 0;">
+              <tr>
+                <td style="padding:14px 18px;">
+                  <p style="margin:0 0 6px;font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:#475569;">📋 Description</p>
+                  <p style="margin:0;font-size:15px;color:#334155;line-height:1.7;">${alert.description || "No additional details provided."}</p>
+                </td>
+              </tr>
+            </table>
+
+          </td>
+        </tr>
+
+        <!-- ── CTA BUTTON ── -->
+        <tr>
+          <td style="padding:0 32px 32px;text-align:center;">
+            <a href="${DASHBOARD_URL}"
+               target="_blank"
+               style="display:inline-block;background:${palette.accent};color:#ffffff;font-size:15px;font-weight:700;text-decoration:none;padding:14px 36px;border-radius:8px;letter-spacing:0.5px;box-shadow:0 4px 12px rgba(0,0,0,0.2);">
+              🗺️ View Alert on Dashboard
+            </a>
+            <p style="margin:12px 0 0;font-size:12px;color:#94a3b8;">
+              Or copy: <span style="color:#475569;">${DASHBOARD_URL}</span>
+            </p>
+          </td>
+        </tr>
+
+        <!-- ── SAFETY NOTICE ── -->
+        <tr>
+          <td style="background:${palette.accentLight};border-top:1px solid ${palette.accentBorder};padding:18px 32px;text-align:center;">
+            <p style="margin:0;font-size:14px;font-weight:700;color:${palette.accent};">⚠️ Take immediate precautions. Follow official guidance.</p>
+          </td>
+        </tr>
+
+        <!-- ── FOOTER ── -->
+        <tr>
+          <td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:20px 32px;text-align:center;">
+            <p style="margin:0 0 4px;font-size:13px;font-weight:600;color:#374151;">Disaster Alert System</p>
+            <p style="margin:0 0 10px;font-size:12px;color:#9ca3af;line-height:1.6;">
+              You received this alert because you subscribed to emergency notifications.<br>
+              Stay safe — your safety is our priority.
+            </p>
+            <p style="margin:0;font-size:11px;color:#cbd5e1;">
+              &copy; ${new Date().getFullYear()} Disaster Alert System &nbsp;|&nbsp; Powered by Team Alpha
+            </p>
+          </td>
+        </tr>
+
+      </table>
+    </td></tr>
+  </table>
+
+</body>
+</html>`;
 
     console.log("[dispatchAlert] Sending emails via Brevo to", validRecipients.length, "valid recipients...");
     const settled = await Promise.allSettled(
