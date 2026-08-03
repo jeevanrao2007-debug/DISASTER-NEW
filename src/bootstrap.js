@@ -25,7 +25,7 @@ const functionsBaseUrl =
   runtimeOverrides.functionsBaseUrl ||
   (isLocalhost
     ? "http://localhost:3000"
-    : "https://disaster-alert-backend.onrender.com");
+    : "https://disaster-new.onrender.com");
 
 window.DISASTER_ALERT_CONFIG = firebaseConfig;
 window.DISASTER_ALERT_FUNCTIONS = Object.freeze({
