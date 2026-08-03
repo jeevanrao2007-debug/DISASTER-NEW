@@ -16,10 +16,10 @@
     "node": ">=18.x"
   },
   "dependencies": {
+    "@getbrevo/brevo": "^2.5.0",
     "cors": "^2.8.6",
     "express": "^4.21.0",
-    "firebase-admin": "^14.2.0",
-    "resend": "^6.18.1"
+    "firebase-admin": "^14.2.0"
   },
   "overrides": {
     "jose": "5.9.6"

@@ -1,6 +1,6 @@
 import express from "express";
 import cors from "cors";
-import { Resend } from "resend";
+import * as SibApiV3Sdk from "@getbrevo/brevo";
 import { getAdminDb, verifyFirebaseAuthToken } from "./helpers/firebaseAdmin.js";
 import { haversineKm } from "./helpers/geo.js";
 
@@ -8,10 +8,16 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // ---------------------------------------------------------------------------
-// Resend HTTP Email Client — replacing Nodemailer SMTP to bypass Render port 587 block
+// Brevo (formerly Sendinblue) Transactional Email Client
+// Free tier allows sending to ANY verified recipient — no domain ownership required.
 // ---------------------------------------------------------------------------
-const resend = new Resend(process.env.RESEND_API_KEY);
-const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "Disaster Alerts <onboarding@resend.dev>";
+const brevoEmailApi = new SibApiV3Sdk.TransactionalEmailsApi();
+brevoEmailApi.setApiKey(
+  SibApiV3Sdk.TransactionalEmailsApiApiKeys.apiKey,
+  process.env.BREVO_API_KEY || ""
+);
+const BREVO_SENDER_EMAIL = process.env.BREVO_SENDER_EMAIL || "";
+const BREVO_SENDER_NAME = "Disaster Alerts";
 
 // Middleware
 app.use(cors());
@@ -176,7 +182,6 @@ app.post("/dispatchAlert", async (req, res) => {
       return;
     }
 
-    const fromAddress = RESEND_FROM_EMAIL;
     const emailSubject = `🚨 ${alert.type} Alert`;
     const emailBody = `Disaster Alert\n\nType:\n${alert.type}\n\nSeverity:\n${alert.level}\n\nLocation:\n${alert.location}\n\nDescription:\n${alert.description}\n\nStay safe.`;
     const emailHtml = `
@@ -190,15 +195,15 @@ app.post("/dispatchAlert", async (req, res) => {
       </div>
     `;
 
-    console.log("[dispatchAlert] Sending emails via Resend HTTP API to", validRecipients.length, "valid recipients...");
+    console.log("[dispatchAlert] Sending emails via Brevo to", validRecipients.length, "valid recipients...");
     const settled = await Promise.allSettled(
-      validRecipients.map((email) =>
-        resend.emails.send({
-          from: fromAddress,
-          to: email,
+      validRecipients.map((recipientEmail) =>
+        brevoEmailApi.sendTransacEmail({
+          sender: { email: BREVO_SENDER_EMAIL, name: BREVO_SENDER_NAME },
+          to: [{ email: recipientEmail }],
           subject: emailSubject,
-          text: emailBody,
-          html: emailHtml
+          htmlContent: emailHtml,
+          textContent: emailBody
         })
       )
     );
@@ -208,24 +213,22 @@ app.post("/dispatchAlert", async (req, res) => {
     const errors = [];
 
     settled.forEach((result, idx) => {
-      if (result.status === "fulfilled" && !result.value?.error) {
+      if (result.status === "fulfilled") {
         sent++;
       } else {
         failed++;
-        const errMsg = result.status === "rejected"
-          ? (result.reason?.message || String(result.reason))
-          : (result.value?.error?.message || JSON.stringify(result.value?.error));
+        const errMsg = result.reason?.message || String(result.reason);
         console.error(`[dispatchAlert] Failed to send to ${validRecipients[idx]}:`, errMsg);
         errors.push({ email: validRecipients[idx], error: errMsg });
       }
     });
 
-    console.log(`[dispatchAlert] Resend email results: sent=${sent}, failed=${failed}, skipped=${invalidRecipients.length}`);
+    console.log(`[dispatchAlert] Brevo email results: sent=${sent}, failed=${failed}, skipped=${invalidRecipients.length}`);
 
     if (sent === 0 && failed > 0) {
       res.status(502).json({
         success: false,
-        error: `Failed to deliver emails via Resend: ${errors[0]?.error || "API failure"}`,
+        error: `Failed to deliver emails via Brevo: ${errors[0]?.error || "API failure"}`,
         sent,
         failed,
         skipped: invalidRecipients.length,
@@ -683,8 +686,8 @@ app.post("/detector", async (req, res) => {
 
 // ---------------------------------------------------------------------------
 // GET /health/email
-// On-demand Resend API key connectivity check — call this after deploying to Render
-// to confirm RESEND_API_KEY is correctly set in the dashboard.
+// On-demand Brevo API key connectivity check — call this after deploying to Render
+// to confirm BREVO_API_KEY is correctly set in the dashboard.
 // Protected by CRON_SECRET so it isn't publicly accessible.
 // ---------------------------------------------------------------------------
 app.get("/health/email", async (req, res) => {
@@ -696,32 +699,43 @@ app.get("/health/email", async (req, res) => {
     return;
   }
 
-  const apiKey = (process.env.RESEND_API_KEY || "").trim();
+  const apiKey = (process.env.BREVO_API_KEY || "").trim();
   if (!apiKey) {
     res.status(500).json({
       success: false,
-      error: "RESEND_API_KEY is missing from environment variables"
+      error: "BREVO_API_KEY is missing from environment variables"
+    });
+    return;
+  }
+
+  const senderEmail = (process.env.BREVO_SENDER_EMAIL || "").trim();
+  if (!senderEmail) {
+    res.status(500).json({
+      success: false,
+      error: "BREVO_SENDER_EMAIL is missing from environment variables"
     });
     return;
   }
 
   try {
-    const { data, error } = await resend.apiKeys.list();
-    if (error) {
-      throw new Error(error.message || JSON.stringify(error));
-    }
+    // Verify the API key by calling Brevo's account info endpoint
+    const accountApi = new SibApiV3Sdk.AccountApi();
+    accountApi.setApiKey(SibApiV3Sdk.AccountApiApiKeys.apiKey, apiKey);
+    const accountInfo = await accountApi.getAccount();
 
-    console.log("[health/email] Resend API key verified OK");
+    console.log("[health/email] Brevo API key verified OK for:", accountInfo?.body?.email);
     res.status(200).json({
       success: true,
-      message: "✅ Resend API key verified successfully",
-      keyPrefix: apiKey.substring(0, 5) + "..."
+      message: "✅ Brevo API key verified successfully",
+      account: accountInfo?.body?.email || "(unknown)",
+      senderEmail,
+      keyPrefix: apiKey.substring(0, 8) + "..."
     });
   } catch (error) {
-    console.error("[health/email] Resend verification failed:", error.message || error);
+    console.error("[health/email] Brevo verification failed:", error.message || error);
     res.status(502).json({
       success: false,
-      error: `Resend API verification failed: ${error.message || String(error)}`
+      error: `Brevo API verification failed: ${error.message || String(error)}`
     });
   }
 });

@@ -5,9 +5,9 @@ services:
     buildCommand: npm install
     startCommand: npm start
     envVars:
-      - key: RESEND_API_KEY
+      - key: BREVO_API_KEY
         sync: false
-      - key: RESEND_FROM_EMAIL
+      - key: BREVO_SENDER_EMAIL
         sync: false
       - key: GEMINI_API_KEY
         sync: false
