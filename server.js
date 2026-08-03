@@ -327,8 +327,7 @@ app.post("/dispatchAlert", async (req, res) => {
 </body>
 </html>`;
 
-    console.log("[dispatchAlert] Sending emails via Brevo to", validRecipients.length, "valid recipients...");
-    console.log("[dispatchAlert] htmlContent sample (first 100 chars):", emailHtml.substring(0, 100));
+    console.log("=== SENDING VIA BREVO === htmlContent length:", emailHtml.length, "first 200 chars:", emailHtml.substring(0, 200));
     console.log("[dispatchAlert] BREVO_SENDER_EMAIL:", BREVO_SENDER_EMAIL);
 
     const settled = await Promise.allSettled(
@@ -348,6 +347,7 @@ app.post("/dispatchAlert", async (req, res) => {
     const errors = [];
 
     settled.forEach((result, idx) => {
+      console.log(`=== BREVO RESPONSE [recipient: ${validRecipients[idx]}] ===`, JSON.stringify(result));
       if (result.status === "fulfilled") {
         sent++;
       } else {
