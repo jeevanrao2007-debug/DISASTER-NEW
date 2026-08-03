@@ -328,6 +328,9 @@ app.post("/dispatchAlert", async (req, res) => {
 </html>`;
 
     console.log("[dispatchAlert] Sending emails via Brevo to", validRecipients.length, "valid recipients...");
+    console.log("[dispatchAlert] htmlContent sample (first 100 chars):", emailHtml.substring(0, 100));
+    console.log("[dispatchAlert] BREVO_SENDER_EMAIL:", BREVO_SENDER_EMAIL);
+
     const settled = await Promise.allSettled(
       validRecipients.map((recipientEmail) =>
         brevoEmailApi.sendTransacEmail({
