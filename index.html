@@ -265,7 +265,10 @@ body { overflow: hidden; }
   </div>
 
   <div class="topbar-right">
-    <div class="sys-status" id="sysStatus">LIVE · 0 ALERTS</div>
+    <div class="live-chip" id="sysStatusChip">
+      <div class="live-dot"></div>
+      <span class="sys-status" id="sysStatus">LIVE &middot; 0 ALERTS</span>
+    </div>
 
     <div class="lang-toggle" aria-label="Language toggle">
       <button id="langEnBtn" class="lang-btn active" type="button">EN</button>
@@ -298,7 +301,10 @@ body { overflow: hidden; }
 </div>
 
 <div id="activityPanel">
-  <h4>⚡ <span data-i18n="ui.live">LIVE</span></h4>
+  <h4 class="live-feed-header">
+    <span class="live-indicator-dot"></span>
+    <span data-i18n="ui.live">LIVE FEED</span>
+  </h4>
   <ul id="activityList">
     <li class="activity-item">
       <div class="ai-dot"></div>

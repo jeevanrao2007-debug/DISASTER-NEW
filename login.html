@@ -23,7 +23,7 @@
     .particle {
       position: absolute;
       border-radius: 50%;
-      background: rgba(59, 130, 246, 0.15);
+      background: rgba(220, 38, 38, 0.08);
       animation: float-particle linear infinite;
       pointer-events: none;
     }
@@ -82,8 +82,8 @@
 
     .input-group input:focus {
       outline: none;
-      border-color: var(--blue);
-      box-shadow: 0 0 0 3px var(--blue-glow);
+      border-color: var(--red);
+      box-shadow: 0 0 0 3px rgba(220,38,38,0.15);
     }
 
     /* [UPGRADE] Loader spinner */
@@ -109,10 +109,14 @@
       width: 100%;
       padding: 12px;
       font-size: 14px;
-      letter-spacing: .5px;
-      background: linear-gradient(135deg, #2563eb, #1d4ed8);
+      font-weight: 800;
+      letter-spacing: .7px;
+      text-transform: uppercase;
+      background: linear-gradient(135deg, #dc2626, #b91c1c);
+      border: 1px solid rgba(239,68,68,0.35);
       position: relative;
       overflow: hidden;
+      box-shadow: 0 0 18px rgba(220,38,38,0.25), inset 0 1px 0 rgba(255,255,255,0.08);
     }
 
     #loginBtn::after {
@@ -120,20 +124,20 @@
       position: absolute;
       top: -50%;
       left: -60%;
-      width: 60%;
+      width: 55%;
       height: 200%;
-      background: rgba(255, 255, 255, 0.06);
+      background: rgba(255, 255, 255, 0.09);
       transform: skewX(-20deg);
       transition: left .5s;
     }
 
     #loginBtn:hover::after {
-      left: 110%;
+      left: 120%;
     }
 
     #loginBtn:hover {
-      background: linear-gradient(135deg, #3b82f6, #2563eb);
-      box-shadow: 0 0 24px var(--blue-glow);
+      background: linear-gradient(135deg, #ef4444, #dc2626);
+      box-shadow: 0 0 30px rgba(220,38,38,0.45);
     }
 
     #loginBtn:disabled {
@@ -178,15 +182,8 @@
     }
 
     @keyframes icon-glow {
-
-      0%,
-      100% {
-        filter: drop-shadow(0 0 4px rgba(59, 130, 246, 0.4));
-      }
-
-      50% {
-        filter: drop-shadow(0 0 14px rgba(59, 130, 246, 0.8));
-      }
+      0%, 100% { filter: drop-shadow(0 0 5px rgba(220, 38, 38, 0.45)); }
+      50%       { filter: drop-shadow(0 0 18px rgba(220, 38, 38, 0.80)); }
     }
   </style>
 

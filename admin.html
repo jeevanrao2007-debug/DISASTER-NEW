@@ -12,36 +12,30 @@
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
   <style>
-    /* ── ADMIN-PAGE-ONLY STYLES ─────────────────────────────── */
+    /* ── ADMIN-PAGE-ONLY OVERRIDES ──────────────────────────── */
 
-    /* Override body overflow for admin since panel is scrollable */
-    body {
-      overflow: hidden;
-    }
+    body { overflow: hidden; }
 
-    /* admin map occupies the space right of the panel */
+    /* Admin map — offset right of the 278px panel + 14px left + 14px gap */
     #map {
       position: absolute;
-      top: 64px;
+      top: var(--topbar-h, 62px);
       bottom: 0;
-      left: 302px;
-      /* panel width + gap */
+      left: 310px;
       right: 0;
       z-index: 1;
       transition: left .3s ease;
     }
 
-    /* ── [UPGRADE] Admin panel — widened for card content ─── */
+    /* Admin panel sizing override */
     .panel {
-      width: 286px;
+      width: 292px;
       top: 74px;
       left: 10px;
       max-height: calc(100vh - 84px);
-      gap: 8px;
-      overflow-y: auto;
     }
 
-    /* ── [UPGRADE] Published badge chip ─────────────────── */
+    /* Published badge chip */
     .badge-pub {
       display: inline-block;
       font-size: 10px;
@@ -55,76 +49,20 @@
       border: 1px solid rgba(34, 197, 94, 0.3);
     }
 
-    /* ── [UPGRADE] Publish btn full-width ───────────────── */
-    #publishBtn {
-      width: 100%;
-      margin-top: 2px;
-    }
-
-    /* ── [UPGRADE] Broadcast progress bar ──────────────── */
-    #broadcastBar {
-      height: 3px;
-      background: linear-gradient(90deg, var(--blue), var(--cyan));
-      border-radius: 4px;
-      width: 0%;
-      transition: width .5s ease;
-      margin-top: 4px;
-    }
-
-    /* ── [UPGRADE] Pending count badge ───────────────────── */
-    #pendingCount {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 18px;
-      height: 18px;
-      border-radius: 50%;
-      background: var(--critical);
-      color: white;
-      font-size: 10px;
-      font-weight: 700;
-      margin-left: 5px;
-      vertical-align: middle;
-      animation: alarm-blink 1.5s step-start infinite;
-      display: none;
-    }
-
-    /* ── [UPGRADE] Activity stream inside admin panel ─── */
+    /* Admin activity list */
     #adminActivityList {
       list-style: none;
       margin: 0;
       padding: 0;
       display: flex;
       flex-direction: column;
-      gap: 4px;
+      gap: 0;
     }
 
-    .activity-item {
-      font-size: 11px;
-      color: var(--text-muted);
-      display: flex;
-      align-items: baseline;
-      gap: 5px;
-      padding: 3px 0;
-      border-bottom: 1px solid rgba(30, 41, 59, 0.4);
-      animation: activity-in .3s ease;
-    }
-
-    .activity-item:last-child {
-      border-bottom: none;
-    }
-
-    /* ── [UPGRADE] Preview marker pulse ─────────────────── */
+    /* Preview marker pulse (red for emergency theme) */
     @keyframes preview-pulse {
-
-      0%,
-      100% {
-        box-shadow: 0 0 0 0 rgba(59, 130, 246, .6);
-      }
-
-      50% {
-        box-shadow: 0 0 0 8px rgba(59, 130, 246, 0);
-      }
+      0%, 100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, .5); }
+      50%       { box-shadow: 0 0 0 8px rgba(220, 38, 38, 0); }
     }
 
     .preview-marker-icon div {
@@ -171,60 +109,58 @@
      ======================================================== -->
   <div class="panel">
 
-    <!-- Manual Alert Section -->
-    <h3>📍 <span data-i18n="ui.manualAlert">Manual Alert</span></h3>
+    <!-- ── SECTION 1: MANUAL ALERT ───────────────────────── -->
+    <div class="panel-section">
+      <h3>📍 <span data-i18n="ui.manualAlert">Manual Alert</span></h3>
 
-    <select id="type">
-      <option value="Flood" data-i18n="alertTypes.flood">Flood</option>
-      <option value="Fire" data-i18n="alertTypes.fire">Fire</option>
-      <option value="Accident" data-i18n="alertTypes.accident">Accident</option>
-      <option value="Earthquake" data-i18n="alertTypes.earthquake">Earthquake</option>
-      <option value="Cyclone" data-i18n="alertTypes.cyclone">Cyclone</option>
-      <option value="Landslide" data-i18n="alertTypes.landslide">Landslide</option>
-    </select>
+      <select id="type">
+        <option value="Flood" data-i18n="alertTypes.flood">Flood</option>
+        <option value="Fire" data-i18n="alertTypes.fire">Fire</option>
+        <option value="Accident" data-i18n="alertTypes.accident">Accident</option>
+        <option value="Earthquake" data-i18n="alertTypes.earthquake">Earthquake</option>
+        <option value="Cyclone" data-i18n="alertTypes.cyclone">Cyclone</option>
+        <option value="Landslide" data-i18n="alertTypes.landslide">Landslide</option>
+      </select>
 
-    <select id="level">
-      <option value="Low" data-i18n="severity.low">Low</option>
-      <option value="Moderate" data-i18n="severity.moderate">Moderate</option>
-      <option value="High" data-i18n="severity.high">High</option>
-      <option value="Critical" data-i18n="severity.critical">Critical</option>
-    </select>
+      <select id="level">
+        <option value="Low" data-i18n="severity.low">Low</option>
+        <option value="Moderate" data-i18n="severity.moderate">Moderate</option>
+        <option value="High" data-i18n="severity.high">High</option>
+        <option value="Critical" data-i18n="severity.critical">Critical</option>
+      </select>
 
-    <input id="desc" placeholder="Short description (optional)">
+      <input id="desc" placeholder="Short description (optional)">
 
-    <!-- [UPGRADE] Coordinate readout in monospace -->
-    <div id="coords">Move mouse over map to pick location</div>
+      <div id="coords">Move mouse over map to pick location</div>
 
-    <!-- [UPGRADE] Named publish button -->
-    <button id="publishBtn" onclick="publish()">🚨 <span data-i18n="ui.publishAlert">Publish Alert</span></button>
+      <button id="publishBtn" onclick="publish()">🚨 <span data-i18n="ui.publishAlert">Publish Alert</span></button>
 
-    <!-- [UPGRADE] Broadcast progress bar -->
-    <div id="broadcastBar"></div>
-
-    <div id="status"></div>
-
-    <hr style="border-color:var(--border);margin:2px 0;">
-
-    <!-- Pending Alerts Section -->
-    <h3>
-      ⚠️ <span data-i18n="ui.autoDetected">Auto-Detected</span>
-      <span id="pendingCount"></span>
-    </h3>
-
-    <div id="pendingBox">
-      <div style="font-size:12px;color:var(--text-dim);padding:6px 0;" data-i18n="ui.noPendingAlerts">No pending alerts</div>
+      <div id="broadcastBar"></div>
+      <div id="status"></div>
     </div>
 
-    <hr style="border-color:var(--border);margin:2px 0;">
+    <!-- ── SECTION 2: AUTO-DETECTED PENDING ──────────────── -->
+    <div class="panel-section">
+      <h3>
+        ⚠️ <span data-i18n="ui.autoDetected">Auto-Detected</span>
+        <span id="pendingCount"></span>
+      </h3>
 
-    <!-- [UPGRADE] Activity Log -->
-    <h3>📋 <span data-i18n="ui.sessionLog">Session Log</span></h3>
-    <ul id="adminActivityList">
-      <li class="activity-item">
-        <div class="ai-dot"></div>
-        <span>Session started</span>
-      </li>
-    </ul>
+      <div id="pendingBox">
+        <div style="font-size:12px;color:var(--text-dim);padding:4px 0;" data-i18n="ui.noPendingAlerts">No pending alerts</div>
+      </div>
+    </div>
+
+    <!-- ── SECTION 3: SESSION LOG ─────────────────────────── -->
+    <div class="panel-section">
+      <h3>📋 <span data-i18n="ui.sessionLog">Session Log</span></h3>
+      <ul id="adminActivityList">
+        <li class="activity-item">
+          <div class="ai-dot"></div>
+          <span>Session started</span>
+        </li>
+      </ul>
+    </div>
 
   </div>
 
