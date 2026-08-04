@@ -110,6 +110,7 @@
   <div class="panel">
 
     <!-- ── SECTION 1: MANUAL ALERT ───────────────────────── -->
+    <!-- Manual Alert Section -->
     <div class="panel-section">
       <h3>📍 <span data-i18n="ui.manualAlert">Manual Alert</span></h3>
 
@@ -131,28 +132,33 @@
 
       <input id="desc" placeholder="Short description (optional)">
 
+      <!-- [UPGRADE] Coordinate readout in monospace -->
       <div id="coords">Move mouse over map to pick location</div>
 
-      <button id="publishBtn" onclick="publish()">🚨 <span data-i18n="ui.publishAlert">Publish Alert</span></button>
+      <!-- [UPGRADE] Named publish button -->
+      <button id="publishBtn" class="btn-publish" onclick="publish()">🚨 <span data-i18n="ui.publishAlert">Publish Alert</span></button>
 
+      <!-- [UPGRADE] Broadcast progress bar -->
       <div id="broadcastBar"></div>
       <div id="status"></div>
-    </div>
+    </div><!-- /.panel-section -->
 
     <!-- ── SECTION 2: AUTO-DETECTED PENDING ──────────────── -->
     <div class="panel-section">
+      <!-- Pending Alerts Section -->
       <h3>
         ⚠️ <span data-i18n="ui.autoDetected">Auto-Detected</span>
         <span id="pendingCount"></span>
       </h3>
 
       <div id="pendingBox">
-        <div style="font-size:12px;color:var(--text-dim);padding:4px 0;" data-i18n="ui.noPendingAlerts">No pending alerts</div>
+        <div style="font-size:12px;color:var(--text-dim);padding:6px 0;" data-i18n="ui.noPendingAlerts">No pending alerts</div>
       </div>
-    </div>
+    </div><!-- /.panel-section -->
 
     <!-- ── SECTION 3: SESSION LOG ─────────────────────────── -->
     <div class="panel-section">
+      <!-- [UPGRADE] Activity Log -->
       <h3>📋 <span data-i18n="ui.sessionLog">Session Log</span></h3>
       <ul id="adminActivityList">
         <li class="activity-item">
@@ -160,7 +166,7 @@
           <span>Session started</span>
         </li>
       </ul>
-    </div>
+    </div><!-- /.panel-section -->
 
   </div>
 

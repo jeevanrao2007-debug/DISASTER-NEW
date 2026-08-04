@@ -19,7 +19,7 @@
 
     /* [UPGRADE] Animated grid background inherited from .center::before in style.css */
 
-    /* [UPGRADE] Floating particles behind card */
+    /* [UPGRADE] Floating particles behind card — red crisis tint */
     .particle {
       position: absolute;
       border-radius: 50%;
@@ -82,8 +82,8 @@
 
     .input-group input:focus {
       outline: none;
-      border-color: var(--red);
-      box-shadow: 0 0 0 3px rgba(220,38,38,0.15);
+      border-color: rgba(220, 38, 38, 0.6);
+      box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.15);
     }
 
     /* [UPGRADE] Loader spinner */
@@ -104,19 +104,15 @@
       }
     }
 
-    /* [UPGRADE] Login button — full-width accent */
+    /* [UPGRADE] Login button — full-width red crisis accent */
     #loginBtn {
       width: 100%;
       padding: 12px;
       font-size: 14px;
-      font-weight: 800;
-      letter-spacing: .7px;
-      text-transform: uppercase;
+      letter-spacing: .5px;
       background: linear-gradient(135deg, #dc2626, #b91c1c);
-      border: 1px solid rgba(239,68,68,0.35);
       position: relative;
       overflow: hidden;
-      box-shadow: 0 0 18px rgba(220,38,38,0.25), inset 0 1px 0 rgba(255,255,255,0.08);
     }
 
     #loginBtn::after {
@@ -124,20 +120,20 @@
       position: absolute;
       top: -50%;
       left: -60%;
-      width: 55%;
+      width: 60%;
       height: 200%;
-      background: rgba(255, 255, 255, 0.09);
+      background: rgba(255, 255, 255, 0.07);
       transform: skewX(-20deg);
       transition: left .5s;
     }
 
     #loginBtn:hover::after {
-      left: 120%;
+      left: 110%;
     }
 
     #loginBtn:hover {
       background: linear-gradient(135deg, #ef4444, #dc2626);
-      box-shadow: 0 0 30px rgba(220,38,38,0.45);
+      box-shadow: 0 0 28px rgba(220, 38, 38, 0.45);
     }
 
     #loginBtn:disabled {
@@ -173,17 +169,24 @@
       color: #60a5fa;
     }
 
-    /* [UPGRADE] Shield icon above title */
+    /* [UPGRADE] Shield icon above title — red crisis glow */
     .login-icon {
       text-align: center;
       font-size: 36px;
       margin-bottom: -6px;
-      animation: icon-glow 3s ease-in-out infinite;
+      animation: icon-glow-red 3s ease-in-out infinite;
     }
 
-    @keyframes icon-glow {
-      0%, 100% { filter: drop-shadow(0 0 5px rgba(220, 38, 38, 0.45)); }
-      50%       { filter: drop-shadow(0 0 18px rgba(220, 38, 38, 0.80)); }
+    @keyframes icon-glow-red {
+
+      0%,
+      100% {
+        filter: drop-shadow(0 0 4px rgba(220, 38, 38, 0.45));
+      }
+
+      50% {
+        filter: drop-shadow(0 0 16px rgba(220, 38, 38, 0.85));
+      }
     }
   </style>
 
