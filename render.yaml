@@ -19,3 +19,5 @@ services:
         sync: false
       - key: CRON_SECRET
         sync: false
+      - key: GMAIL_USER
+        sync: false
