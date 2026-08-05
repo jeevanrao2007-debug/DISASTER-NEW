@@ -550,8 +550,13 @@ app.post("/aiAdvisor", async (req, res) => {
   }
 });
 
-// Helpers for nearbyResources
-const GOOGLE_PLACES_ENDPOINT = "https://maps.googleapis.com/maps/api/place/nearbysearch/json";
+// Helpers for nearbyResources (Overpass OpenStreetMap API)
+const OVERPASS_ENDPOINTS = [
+  "https://overpass-api.de/api/interpreter",
+  "https://overpass.kumi.systems/api/interpreter",
+  "https://overpass.nchc.org.tw/api/interpreter"
+];
+
 const CACHE_TTL_MS = 5 * 60 * 1000;
 const DEFAULT_RADIUS_METERS = 5000;
 const MIN_RADIUS_METERS = 500;
@@ -574,33 +579,51 @@ function cacheKey(lat, lng, radius) {
   return `${lat.toFixed(4)}:${lng.toFixed(4)}:${radius}`;
 }
 
-function normalizeKind(kind) {
-  if (kind === "hospital") {
+function getOverpassKind(tags = {}) {
+  const amenity = (tags.amenity || "").toLowerCase();
+  const building = (tags.building || "").toLowerCase();
+  const healthcare = (tags.healthcare || "").toLowerCase();
+
+  if (amenity === "hospital" || healthcare === "hospital" || amenity === "clinic" || amenity === "doctors") {
     return "hospital";
   }
-  if (kind === "police") {
+  if (amenity === "police") {
     return "police";
+  }
+  if (amenity === "shelter" || building === "shelter" || amenity === "social_facility" || tags.social_facility) {
+    return "shelter";
   }
   return "shelter";
 }
 
-function toPublicPlace(place, kind, lat, lng) {
-  const location = place?.geometry?.location || {};
-  const placeLat = toNumber(location.lat);
-  const placeLng = toNumber(location.lng);
+function toOverpassPlace(elem, targetLat, targetLng) {
+  const tags = elem.tags || {};
+  const placeLat = elem.lat ?? elem.center?.lat;
+  const placeLng = elem.lon ?? elem.center?.lon;
 
-  if (placeLat == null || placeLng == null) {
+  if (placeLat == null || placeLng == null || !Number.isFinite(placeLat) || !Number.isFinite(placeLng)) {
     return null;
   }
 
-  const distanceKm = haversineKm(lat, lng, placeLat, placeLng);
+  const kind = getOverpassKind(tags);
+  const distanceKm = haversineKm(targetLat, targetLng, placeLat, placeLng);
   const distanceMeters = Math.round(distanceKm * 1000);
 
+  const rawName = tags.name || tags["name:en"] || tags.operator || "";
+  const fallbackKindName = kind.charAt(0).toUpperCase() + kind.slice(1);
+  const name = rawName.trim() || `${fallbackKindName} Facility`;
+
+  const street = [tags["addr:housenumber"], tags["addr:street"]].filter(Boolean).join(" ");
+  const area = tags["addr:suburb"] || tags["addr:district"] || tags["addr:neighbourhood"] || "";
+  const city = tags["addr:city"] || tags["addr:town"] || "";
+
+  const vicinity = tags["addr:full"] || [street, area, city].filter(Boolean).join(", ") || street || area || city || "Address unavailable";
+
   return {
-    id: place.place_id,
-    name: place.name || "Unknown",
-    type: normalizeKind(kind),
-    vicinity: place.vicinity || place.formatted_address || "Address unavailable",
+    id: `${elem.type || "node"}-${elem.id}`,
+    name,
+    type: kind,
+    vicinity,
     lat: placeLat,
     lng: placeLng,
     distanceMeters,
@@ -608,32 +631,53 @@ function toPublicPlace(place, kind, lat, lng) {
   };
 }
 
-async function fetchNearbyByKind({ lat, lng, radius, apiKey, type, keyword, kind }) {
-  const params = new URLSearchParams({
-    key: apiKey,
-    location: `${lat},${lng}`,
-    radius: String(radius),
-    type
-  });
+async function fetchOverpassResources(lat, lng, radius, timeoutMs = 9000) {
+  const query = `
+    [out:json][timeout:10];
+    (
+      node["amenity"="hospital"](around:${radius},${lat},${lng});
+      way["amenity"="hospital"](around:${radius},${lat},${lng});
+      node["amenity"="police"](around:${radius},${lat},${lng});
+      way["amenity"="police"](around:${radius},${lat},${lng});
+      node["amenity"="shelter"](around:${radius},${lat},${lng});
+      way["amenity"="shelter"](around:${radius},${lat},${lng});
+      node["building"="shelter"](around:${radius},${lat},${lng});
+      way["building"="shelter"](around:${radius},${lat},${lng});
+    );
+    out center body;
+  `;
 
-  if (keyword) {
-    params.set("keyword", keyword);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    for (const endpoint of OVERPASS_ENDPOINTS) {
+      try {
+        const response = await fetch(endpoint, {
+          method: "POST",
+          signal: controller.signal,
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "User-Agent": "DisasterAlertSystem/1.0 (contact: otcwwe1212@gmail.com)"
+          },
+          body: "data=" + encodeURIComponent(query)
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          return Array.isArray(data.elements) ? data.elements : [];
+        }
+      } catch (err) {
+        if (err.name === "AbortError") {
+          throw err;
+        }
+        console.warn(`[overpass] Endpoint ${endpoint} failed:`, err.message);
+      }
+    }
+    return [];
+  } finally {
+    clearTimeout(timer);
   }
-
-  const result = await fetch(`${GOOGLE_PLACES_ENDPOINT}?${params.toString()}`);
-
-  if (!result.ok) {
-    throw new Error(`Google Places request failed (${result.status})`);
-  }
-
-  const payload = await result.json();
-  if (payload.status !== "OK" && payload.status !== "ZERO_RESULTS") {
-    throw new Error(`Google Places status: ${payload.status || "UNKNOWN"}`);
-  }
-
-  return (payload.results || [])
-    .map((entry) => toPublicPlace(entry, kind, lat, lng))
-    .filter(Boolean);
 }
 
 function mergeAndRank(...groups) {
@@ -680,16 +724,6 @@ app.post("/nearbyResources", async (req, res) => {
     return;
   }
 
-  const apiKey = (process.env.GOOGLE_PLACES_API_KEY || "").trim();
-  if (!apiKey) {
-    res.status(503).json({
-      success: false,
-      places: [],
-      error: "Nearby resources service is not configured"
-    });
-    return;
-  }
-
   const key = cacheKey(lat, lng, radius);
   const cached = nearbyResourcesCache.get(key);
 
@@ -703,13 +737,12 @@ app.post("/nearbyResources", async (req, res) => {
   }
 
   try {
-    const [hospitals, policeStations, shelters] = await Promise.all([
-      fetchNearbyByKind({ lat, lng, radius, apiKey, type: "hospital", kind: "hospital" }),
-      fetchNearbyByKind({ lat, lng, radius, apiKey, type: "police", kind: "police" }),
-      fetchNearbyByKind({ lat, lng, radius, apiKey, type: "lodging", keyword: "shelter", kind: "shelter" })
-    ]);
+    const rawElements = await fetchOverpassResources(lat, lng, radius, 9000);
+    const parsedPlaces = rawElements
+      .map((elem) => toOverpassPlace(elem, lat, lng))
+      .filter(Boolean);
 
-    const places = mergeAndRank(hospitals, policeStations, shelters);
+    const places = mergeAndRank(parsedPlaces);
 
     nearbyResourcesCache.set(key, {
       createdAt: Date.now(),
@@ -722,11 +755,11 @@ app.post("/nearbyResources", async (req, res) => {
       cached: false
     });
   } catch (error) {
-    console.error("[nearbyResources] Error:", error);
-    res.status(502).json({
-      success: false,
+    console.warn("[nearbyResources] Overpass fetch failed/timed out, returning empty fallback:", error.message);
+    res.status(200).json({
+      success: true,
       places: [],
-      error: "Failed to fetch nearby resources"
+      cached: false
     });
   }
 });
