@@ -3,6 +3,7 @@ import cors from "cors";
 import * as SibApiV3Sdk from "@getbrevo/brevo";
 import { getAdminDb, verifyFirebaseAuthToken } from "./helpers/firebaseAdmin.js";
 import { haversineKm } from "./helpers/geo.js";
+import { reverseGeocode } from "./helpers/geocode.js";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -92,10 +93,19 @@ function normalizeAlertPayload(input = {}) {
   const severity = String(input.severity || input.level || "moderate").trim().toLowerCase();
   const level = String(input.level || input.severity || "Moderate").trim();
   
-  const lat = input.lat != null ? Number(input.lat) : null;
-  const lng = input.lng != null ? Number(input.lng) : null;
+  let lat = input.lat != null ? Number(input.lat) : null;
+  let lng = input.lng != null ? Number(input.lng) : null;
+
+  // If lat/lng missing, try parsing from input.location if formatted as "lat, lng"
+  if ((lat === null || lng === null || !Number.isFinite(lat) || !Number.isFinite(lng)) && typeof input.location === "string") {
+    const match = input.location.match(/^(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)$/);
+    if (match) {
+      lat = Number(match[1]);
+      lng = Number(match[2]);
+    }
+  }
+
   const hasCoordinates = lat !== null && lng !== null && Number.isFinite(lat) && Number.isFinite(lng);
-  
   const location = String(input.location || (hasCoordinates ? `${lat.toFixed(4)}, ${lng.toFixed(4)}` : "your area")).trim();
   const description = String(input.description || input.desc || "").trim();
   const createdAt = Number.isFinite(Number(input.createdAt)) ? Number(input.createdAt) : Date.now();
@@ -106,7 +116,9 @@ function normalizeAlertPayload(input = {}) {
     level,
     location,
     description,
-    createdAt
+    createdAt,
+    lat: hasCoordinates ? lat : null,
+    lng: hasCoordinates ? lng : null
   };
 }
 
@@ -122,6 +134,24 @@ app.post("/dispatchAlert", async (req, res) => {
     if (!alert.type) {
       res.status(400).json({ success: false, error: "Alert type is required" });
       return;
+    }
+
+    // Reverse geocode if coordinates are present
+    if (alert.lat !== null && alert.lng !== null) {
+      try {
+        console.log(`[dispatchAlert] Reverse geocoding lat=${alert.lat}, lng=${alert.lng}...`);
+        const placeName = await reverseGeocode(alert.lat, alert.lng, 5000);
+        const rawCoords = `${alert.lat.toFixed(4)}, ${alert.lng.toFixed(4)}`;
+
+        if (placeName && placeName !== rawCoords) {
+          alert.location = `${placeName} (${rawCoords})`;
+        } else if (placeName) {
+          alert.location = placeName;
+        }
+        console.log("[dispatchAlert] Resolved readable location:", alert.location);
+      } catch (geoErr) {
+        console.warn("[dispatchAlert] Geocoding error, falling back to location/coords:", geoErr.message);
+      }
     }
 
     const db = getAdminDb();
