@@ -1999,44 +1999,127 @@ button:active { transform:scale(.96); }
 }
 
 /* =========================================================
-   USER GPS LOCATION MARKER & DESTINATION PIN
+   HUMAN-LIKE FIGURE USER LOCATION POINTER & DESTINATION PIN
    ========================================================= */
-.user-gps-icon-wrapper {
+.human-gps-icon-wrapper {
   background: transparent;
   border: none;
 }
 
-.user-gps-marker {
+.human-pointer-marker {
   position: relative;
+  width: 44px;
+  height: 56px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  cursor: pointer;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.6));
+}
+
+.human-radar-pulse {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 36px;
+  height: 16px;
+  border-radius: 50%;
+  background: rgba(56, 189, 248, 0.35);
+  border: 1.5px solid rgba(56, 189, 248, 0.7);
+  transform: translate(-50%, 50%);
+  animation: human-pulse-radar 2.2s cubic-bezier(0.25, 0.8, 0.25, 1) infinite;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.human-radar-pulse-2 {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 54px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(56, 189, 248, 0.15);
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  transform: translate(-50%, 50%);
+  animation: human-pulse-radar 2.2s cubic-bezier(0.25, 0.8, 0.25, 1) infinite 0.75s;
+  z-index: 1;
+  pointer-events: none;
+}
+
+@keyframes human-pulse-radar {
+  0% { transform: translate(-50%, 50%) scale(0.3); opacity: 1; }
+  100% { transform: translate(-50%, 50%) scale(2); opacity: 0; }
+}
+
+.human-figure-wrapper {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  z-index: 2;
+  animation: human-float 3s ease-in-out infinite;
+}
+
+@keyframes human-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+.human-you-tag {
+  background: linear-gradient(135deg, #0284c7, #0369a1);
+  color: #ffffff;
+  font-family: var(--font-heading);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0 2px 8px rgba(2, 132, 199, 0.6);
+  margin-bottom: 2px;
+  text-transform: uppercase;
+}
+
+.human-figure-avatar {
   width: 32px;
   height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #0f172a, #0369a1);
+  border: 2px solid #38bdf8;
   display: flex;
   align-items: center;
   justify-content: center;
+  box-shadow: 0 0 16px rgba(56, 189, 248, 0.6), inset 0 0 8px rgba(56, 189, 248, 0.4);
 }
 
-.user-gps-core {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: #38bdf8;
-  border: 2.5px solid #ffffff;
-  box-shadow: 0 0 12px #38bdf8, 0 0 24px rgba(56, 189, 248, 0.6);
-  z-index: 2;
+.human-ground-pin {
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 6px solid #38bdf8;
+  margin-top: -1px;
 }
 
-.user-gps-pulse {
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  background: rgba(56, 189, 248, 0.35);
-  animation: user-gps-radar 2s ease-out infinite;
-  z-index: 1;
+.route-shortest-tag {
+  font-family: var(--font-heading);
+  font-size: 9.5px;
+  font-weight: 800;
+  color: #fbbf24;
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  border-radius: 6px;
+  padding: 2px 6px;
+  letter-spacing: 0.6px;
+  white-space: nowrap;
+  animation: pulse-glow 2s infinite;
 }
 
-@keyframes user-gps-radar {
-  0% { transform: scale(0.5); opacity: 1; }
-  100% { transform: scale(2.2); opacity: 0; }
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 4px rgba(245, 158, 11, 0.2); }
+  50% { box-shadow: 0 0 10px rgba(245, 158, 11, 0.5); }
 }
 
 .dest-pin-wrapper {

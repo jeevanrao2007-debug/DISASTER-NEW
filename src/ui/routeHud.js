@@ -61,10 +61,13 @@ export function showRouteHud({
         <div class="route-hud-icon">${icon}</div>
         <div class="route-hud-info">
           <div class="route-hud-dest-row">
-            <h4 class="route-hud-name" title="${name}">${name}</h4>
+            <div style="display:flex;align-items:center;gap:6px;min-width:0;">
+              <h4 class="route-hud-name" title="${name}">${name}</h4>
+              <span class="route-shortest-tag">⚡ SHORTEST PATH</span>
+            </div>
             <span class="route-hud-badge ${mode}">${distance} km &middot; ${duration} min</span>
           </div>
-          <div class="route-hud-address">${vicinity}</div>
+          <div class="route-hud-address">${vicinity || 'Emergency facility location'}</div>
         </div>
       </div>
 

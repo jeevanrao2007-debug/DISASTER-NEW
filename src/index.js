@@ -46,9 +46,15 @@ applyDocumentTranslations();
 setupAudioUnlock();
 initPushService();
 
-// Quietly check for GPS location on startup if already granted
+// Automatically request user location and display the human-like figure pointer on dashboard load
 if ("geolocation" in navigator) {
-  getUserLocation().catch(() => {});
+  getUserLocation()
+    .then((coords) => {
+      console.log("[index] Human-like user location pointer active at:", coords);
+    })
+    .catch((err) => {
+      console.log("[index] Geolocation not permitted on startup:", err.message);
+    });
 }
 
 // Locate Me button handler

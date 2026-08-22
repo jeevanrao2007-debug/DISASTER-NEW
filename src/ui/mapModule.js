@@ -73,24 +73,39 @@ export function getMap() {
 }
 
 /**
- * Creates and updates the pulsating blue GPS marker for the user's current position.
+ * Creates and updates the human-like figure pointer for the user's current position.
  */
 export function setUserLocationMarker(lat, lng) {
   if (!mapInstance) return null;
   lastKnownUserLocation = { lat: Number(lat), lng: Number(lng) };
 
   const html = `
-    <div class="user-gps-marker" title="Your Location">
-      <div class="user-gps-pulse"></div>
-      <div class="user-gps-core"></div>
+    <div class="human-pointer-marker" title="Your Live Location">
+      <div class="human-radar-pulse"></div>
+      <div class="human-radar-pulse-2"></div>
+      <div class="human-figure-wrapper">
+        <div class="human-you-tag">YOU</div>
+        <div class="human-figure-avatar">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+            <!-- Humanoid Head -->
+            <circle cx="12" cy="5" r="3" fill="#38bdf8" stroke="#ffffff" stroke-width="1.5" />
+            <!-- Humanoid Torso & Arms -->
+            <path d="M7 21v-5a3 3 0 0 1 3-3h4a3 3 0 0 1 3 3v5" fill="#0284c7" stroke="#38bdf8" stroke-width="2" />
+            <!-- Humanoid Legs -->
+            <path d="M10 16v5M14 16v5" stroke="#ffffff" stroke-width="2" stroke-linecap="round" />
+          </svg>
+        </div>
+        <div class="human-ground-pin"></div>
+      </div>
     </div>
   `;
 
   const icon = L.divIcon({
     html,
-    className: "user-gps-icon-wrapper",
-    iconSize: [32, 32],
-    iconAnchor: [16, 16]
+    className: "human-gps-icon-wrapper",
+    iconSize: [44, 56],
+    iconAnchor: [22, 54],
+    popupAnchor: [0, -52]
   });
 
   if (userMarker) {
@@ -98,9 +113,16 @@ export function setUserLocationMarker(lat, lng) {
   } else {
     userMarker = L.marker([lat, lng], { icon, zIndexOffset: 1000 }).addTo(mapInstance);
     userMarker.bindPopup(`
-      <div style="font-family:'Inter',sans-serif;text-align:center;padding:4px;">
-        <b style="color:#38bdf8;font-size:13px;">📍 You are here</b><br>
-        <span style="font-size:11px;color:#94a3b8;">${lat.toFixed(4)}, ${lng.toFixed(4)}</span>
+      <div style="font-family:'Inter',sans-serif;text-align:center;padding:6px 8px;min-width:130px;">
+        <div style="font-size:11px;font-weight:700;letter-spacing:1px;color:#38bdf8;text-transform:uppercase;margin-bottom:2px;">
+          🧍 YOU ARE HERE
+        </div>
+        <div style="font-size:12px;font-weight:600;color:#f8fafc;">
+          Current Location
+        </div>
+        <span style="font-size:10.5px;color:#94a3b8;font-family:'JetBrains Mono',monospace;">
+          ${lat.toFixed(4)}, ${lng.toFixed(4)}
+        </span>
       </div>
     `);
   }

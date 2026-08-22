@@ -226,8 +226,8 @@ export function showResourcesPanelData(places = []) {
             <div class="nearby-vicinity">${vicinity}</div>
 
             <div class="nearby-actions">
-              <button class="nearby-action-btn primary nearby-route-trigger" title="Get live turn-by-turn route">
-                🚗 Route Here
+              <button class="nearby-action-btn primary nearby-route-trigger" title="Show shortest driving path from your location">
+                ⚡ Shortest Route
               </button>
               <button class="nearby-action-btn secondary nearby-focus-trigger" title="Center on map">
                 📍 Locate
