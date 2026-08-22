@@ -92,6 +92,9 @@
     <button type="button" id="pabEnableBtn" class="pab-enable-btn" onclick="window.handleEnablePush()">
       Enable Push
     </button>
+    <button type="button" id="pabInstallBtn" class="pab-install-btn" onclick="window.handleInstallApp()" title="Download & Install Android App">
+      📲 Install App
+    </button>
     <button type="button" id="pabTestBtn" class="pab-test-btn" onclick="window.testDeviceVibration()" title="Test 6-sec vibration">
       ⚡ Test
     </button>
@@ -292,13 +295,21 @@
     }
   });
 
-  pwaInstallBtn?.addEventListener("click", async () => {
-    if (!deferredPrompt) return;
-    pwaBanner.classList.remove("visible");
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    console.log("[PWA] Install prompt outcome:", outcome);
-    deferredPrompt = null;
+  // Manual Install App Button Handler
+  window.handleInstallApp = async () => {
+    if (deferredPrompt) {
+      pwaBanner?.classList.remove("visible");
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      console.log("[PWA] Install prompt outcome:", outcome);
+      deferredPrompt = null;
+    } else {
+      alert("📲 To Install the App on Android:\n\n1. Tap the 3 dots (⋮) in the top-right corner of Chrome.\n2. Tap 'Add to Home screen' or 'Install App'.\n3. The Disaster Alert App will be added to your home screen with full pocket vibration privileges!");
+    }
+  };
+
+  pwaInstallBtn?.addEventListener("click", () => {
+    window.handleInstallApp();
   });
 
   pwaDismissBtn?.addEventListener("click", () => {
