@@ -429,102 +429,108 @@ app.post("/dispatchAlert", async (req, res) => {
     }
 
     // -------------------------------------------------------------------------
-    // Geofenced FCM Push Notifications (within PUSH_RADIUS_KM)
+    // Geofenced FCM Push Notifications (50km Radius with Emergency Fallback)
     // -------------------------------------------------------------------------
-    const PUSH_RADIUS_KM = 20;
+    const PUSH_RADIUS_KM = Number(process.env.PUSH_RADIUS_KM || 50);
     let pushSent = 0;
     let pushFailed = 0;
     const pushErrors = [];
     let pushEligibleCount = 0;
 
-    if (alert.lat !== null && alert.lng !== null) {
-      console.log(`=== INITIATING GEOFENCED PUSH NOTIFICATIONS (Radius: ${PUSH_RADIUS_KM}km, Alert Lat=${alert.lat}, Lng=${alert.lng}) ===`);
-      try {
-        const pushSnapshot = await db.ref("pushSubscribers").once("value");
-        const pushData = pushSnapshot.val() || {};
-        const pushSubscribers = Object.entries(pushData).map(([key, value]) => ({
-          dbKey: key,
-          ...value
-        }));
+    try {
+      console.log(`=== INITIATING FCM PUSH NOTIFICATIONS (Radius: ${PUSH_RADIUS_KM}km, Alert Lat=${alert.lat}, Lng=${alert.lng}) ===`);
+      const pushSnapshot = await db.ref("pushSubscribers").once("value");
+      const pushData = pushSnapshot.val() || {};
+      const pushSubscribers = Object.entries(pushData).map(([key, value]) => ({
+        dbKey: key,
+        ...value
+      }));
 
-        console.log(`[dispatchAlert:Push] Found ${pushSubscribers.length} total push subscribers registered in RTDB.`);
+      console.log(`[dispatchAlert:Push] Found ${pushSubscribers.length} total push subscribers registered in RTDB.`);
 
-        const inRangeSubscribers = pushSubscribers.filter((sub) => {
-          if (!sub.token || typeof sub.lat !== "number" || typeof sub.lng !== "number") {
-            return false;
-          }
+      let targetSubscribers = [];
+      if (alert.lat !== null && alert.lng !== null && !alert.broadcastAll) {
+        targetSubscribers = pushSubscribers.filter((sub) => {
+          if (!sub.token) return false;
+          if (typeof sub.lat !== "number" || typeof sub.lng !== "number") return true; // Include if coords missing
           const dist = haversineKm(alert.lat, alert.lng, sub.lat, sub.lng);
           return dist <= PUSH_RADIUS_KM;
         });
 
-        pushEligibleCount = inRangeSubscribers.length;
-        console.log(`[dispatchAlert:Push] ${pushEligibleCount} subscribers within ${PUSH_RADIUS_KM}km radius.`);
+        // If no subscribers within 50km, fall back to all subscribers so critical test broadcasts are never lost
+        if (targetSubscribers.length === 0 && pushSubscribers.length > 0) {
+          console.log("[dispatchAlert:Push] No subscribers strictly within radius; broadcasting to all registered devices.");
+          targetSubscribers = pushSubscribers;
+        }
+      } else {
+        targetSubscribers = pushSubscribers;
+      }
 
-        if (pushEligibleCount > 0) {
-          const messaging = getAdminMessaging();
+      pushEligibleCount = targetSubscribers.length;
+      console.log(`[dispatchAlert:Push] ${pushEligibleCount} subscribers selected for dispatch.`);
 
-          for (const sub of inRangeSubscribers) {
-            const pushTitle = `🚨 ${alert.type} Alert Nearby`;
-            const pushBody = alert.description || `${alert.type} emergency reported in your area. Take immediate precautions.`;
+      if (pushEligibleCount > 0) {
+        const messaging = getAdminMessaging();
 
-            // Data-only payload ensures Android Chrome hands full control to our Service Worker
-            // without intercepting with the browser's default no-vibration notification handler.
-            const payload = {
-              webpush: {
-                headers: {
-                  Urgency: "high",
-                  TTL: "86400"
-                },
-                fcmOptions: {
-                  link: DASHBOARD_URL
-                }
+        for (const sub of targetSubscribers) {
+          const pushTitle = `🚨 ${alert.type} Alert Nearby`;
+          const pushBody = alert.description || `${alert.type} emergency reported in your area. Take immediate precautions.`;
+
+          // Data-only payload ensures Android Chrome hands full control to our Service Worker
+          // without intercepting with the browser's default no-vibration notification handler.
+          const payload = {
+            webpush: {
+              headers: {
+                Urgency: "high",
+                TTL: "86400"
               },
-              android: {
-                priority: "high"
-              },
-              data: {
-                title: String(pushTitle),
-                body: String(pushBody),
-                type: String(alert.type || ""),
-                severity: String(alert.severity || alert.level || "critical"),
-                location: String(alert.location || ""),
-                lat: String(alert.lat ?? ""),
-                lng: String(alert.lng ?? ""),
-                url: String(DASHBOARD_URL),
-                alertId: String(alert.createdAt || Date.now())
-              },
-              token: sub.token
-            };
-
-            try {
-              const fcmResponse = await messaging.send(payload);
-              console.log(`[dispatchAlert:Push] Successfully sent FCM push to subscriber (key=${sub.dbKey}):`, fcmResponse);
-              pushSent++;
-            } catch (fcmErr) {
-              pushFailed++;
-              const errMsg = fcmErr.message || String(fcmErr);
-              console.error(`[dispatchAlert:Push] FCM send failed for subscriber (key=${sub.dbKey}):`, errMsg);
-              pushErrors.push({ tokenKey: sub.dbKey, error: errMsg });
-
-              // Automatically clean up invalid/expired tokens
-              if (
-                fcmErr.code === "messaging/registration-token-not-registered" ||
-                fcmErr.code === "messaging/invalid-registration-token" ||
-                /not-registered|invalid-registration-token|invalid argument/i.test(errMsg)
-              ) {
-                console.log(`[dispatchAlert:Push] Removing invalid/unregistered token from database: ${sub.dbKey}`);
-                await db.ref(`pushSubscribers/${sub.dbKey}`).remove().catch((cleanupErr) => {
-                  console.warn(`[dispatchAlert:Push] Failed to remove bad token ${sub.dbKey}:`, cleanupErr.message);
-                });
+              fcmOptions: {
+                link: DASHBOARD_URL
               }
+            },
+            android: {
+              priority: "high"
+            },
+            data: {
+              title: String(pushTitle),
+              body: String(pushBody),
+              type: String(alert.type || ""),
+              severity: String(alert.severity || alert.level || "critical"),
+              location: String(alert.location || ""),
+              lat: String(alert.lat ?? ""),
+              lng: String(alert.lng ?? ""),
+              url: String(DASHBOARD_URL),
+              alertId: String(alert.createdAt || Date.now())
+            },
+            token: sub.token
+          };
+
+          try {
+            const fcmResponse = await messaging.send(payload);
+            console.log(`[dispatchAlert:Push] Successfully sent FCM push to subscriber (key=${sub.dbKey}):`, fcmResponse);
+            pushSent++;
+          } catch (fcmErr) {
+            pushFailed++;
+            const errMsg = fcmErr.message || String(fcmErr);
+            console.error(`[dispatchAlert:Push] FCM send failed for subscriber (key=${sub.dbKey}):`, errMsg);
+            pushErrors.push({ tokenKey: sub.dbKey, error: errMsg });
+
+            // Automatically clean up invalid/expired tokens
+            if (
+              fcmErr.code === "messaging/registration-token-not-registered" ||
+              fcmErr.code === "messaging/invalid-registration-token" ||
+              /not-registered|invalid-registration-token|invalid argument/i.test(errMsg)
+            ) {
+              console.log(`[dispatchAlert:Push] Removing invalid/unregistered token from database: ${sub.dbKey}`);
+              await db.ref(`pushSubscribers/${sub.dbKey}`).remove().catch((cleanupErr) => {
+                console.warn(`[dispatchAlert:Push] Failed to remove bad token ${sub.dbKey}:`, cleanupErr.message);
+              });
             }
           }
         }
-      } catch (pushErr) {
-        console.error("[dispatchAlert:Push] Unexpected error during push dispatch:", pushErr);
       }
-    } else {
-      console.log("[dispatchAlert:Push] Alert has no coordinates; skipping geofenced push dispatch.");
+    } catch (pushErr) {
+      console.error("[dispatchAlert:Push] Unexpected error during push dispatch:", pushErr);
     }
 
     console.log(`[dispatchAlert] Summary: emailSent=${sent}, emailFailed=${failed}, pushSent=${pushSent}, pushFailed=${pushFailed}`);

@@ -155,13 +155,26 @@
     <button class="modal-close" onclick="window.closeSubscribeModal()" aria-label="Close dialog">✕</button>
     <div class="modal-icon">🚨</div>
     <h2 id="subModalTitle">Subscribe to Emergency Alerts</h2>
-    <p>Receive critical disaster warnings directly in your inbox and geofenced push alerts when nearby.</p>
+    <!-- Dedicated Pocket Push & Vibration Registration Box -->
+    <div style="background:rgba(220,38,38,0.12);border:1px solid rgba(220,38,38,0.3);border-radius:12px;padding:12px;margin-bottom:16px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+        <div style="text-align:left;">
+          <strong style="display:block;font-size:12.5px;color:#f8fafc;">📳 Lock-Screen Pocket Alerts</strong>
+          <span style="font-size:11px;color:#94a3b8;">Heavy 6-sec SOS vibration when screen locked</span>
+        </div>
+        <button type="button" id="enablePushBtn" onclick="window.handleEnablePush()" style="background:linear-gradient(135deg,#dc2626,#b91c1c);color:white;border:none;padding:8px 12px;border-radius:8px;font-size:11.5px;font-weight:700;cursor:pointer;white-space:nowrap;transition:all 0.2s;">
+          Enable Push
+        </button>
+      </div>
+      <div id="pushStatusBadge" style="margin-top:6px;font-size:11px;text-align:left;color:#94a3b8;"></div>
+    </div>
 
-    <label for="subEmail">Email Address</label>
-    <input type="email" id="subEmail" placeholder="name@example.com" autocomplete="email" required>
+    <!-- Email Alerts Form -->
+    <label for="subEmail">Email Address (Optional)</label>
+    <input type="email" id="subEmail" placeholder="name@example.com" autocomplete="email">
 
     <button class="sub-submit-btn" id="subSubmitBtn" onclick="window.handleSubscribe()">
-      Subscribe to Emergency Alerts
+      Subscribe Email Alerts
     </button>
 
     <div style="display:flex;gap:8px;margin-top:10px;">
@@ -184,6 +197,32 @@
   import { triggerPocketVibration } from "./src/ui/alarmModule.js";
   window._aiRequestAdvice = requestAdviceForAlert;
   window._aiOpenPanel = openAdvisorPanel;
+
+  // Direct Push Registration Handler
+  window.handleEnablePush = async () => {
+    const btn = document.getElementById("enablePushBtn");
+    const badge = document.getElementById("pushStatusBadge");
+    if (btn) { btn.disabled = true; btn.textContent = "Connecting..."; }
+    if (badge) { badge.style.color = "#94a3b8"; badge.textContent = "Requesting notification & GPS permissions..."; }
+
+    try {
+      const { registerPushSubscription } = await import("./src/services/pushService.js");
+      const res = await registerPushSubscription();
+
+      if (res.success) {
+        if (btn) { btn.textContent = "✔ Enabled"; btn.style.background = "linear-gradient(135deg,#16a34a,#15803d)"; }
+        if (badge) { badge.style.color = "#86efac"; badge.textContent = "✔ Registered! Your phone will vibrate on critical alerts."; }
+        // Test a short pulse to confirm
+        if ("vibrate" in navigator) navigator.vibrate([200, 100, 200]);
+      } else {
+        if (btn) { btn.disabled = false; btn.textContent = "Retry"; }
+        if (badge) { badge.style.color = "#fca5a5"; badge.textContent = `⚠ ${res.reason || res.error || "Permission required"}`; }
+      }
+    } catch (err) {
+      if (btn) { btn.disabled = false; btn.textContent = "Retry"; }
+      if (badge) { badge.style.color = "#fca5a5"; badge.textContent = `⚠ Error: ${err.message}`; }
+    }
+  };
 
   // Test vibration function for user diagnostics
   window.testDeviceVibration = () => {

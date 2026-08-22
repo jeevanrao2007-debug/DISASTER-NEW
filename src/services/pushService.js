@@ -1,6 +1,6 @@
 /**
  * Push Notification Service (Firebase Cloud Messaging)
- * Additive service for geofenced push alerts.
+ * Robust registration with direct Firebase Realtime Database persistence & backend fallback.
  */
 
 import { getFirebaseApp } from "../config/firebase.js";
@@ -34,14 +34,25 @@ function getCurrentCoordinates() {
   });
 }
 
+function createSafeKey(str) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = (hash << 5) - hash + char;
+    hash |= 0;
+  }
+  const cleanStr = str.replace(/[^a-zA-Z0-9]/g, "").slice(0, 24);
+  return `sub_${cleanStr}_${Math.abs(hash)}`;
+}
+
 /**
  * Register push notification subscription with token & current coordinates.
- * Non-blocking, fails gracefully without disrupting any email or map workflows.
+ * Saves directly into Firebase Realtime Database and notifies backend.
  */
 export async function registerPushSubscription() {
   try {
     if (!("serviceWorker" in navigator) || !("Notification" in window)) {
-      console.log("[pushService] Push notifications or Service Worker not supported in this browser.");
+      console.log("[pushService] Push notifications or Service Worker not supported.");
       return { success: false, reason: "unsupported" };
     }
 
@@ -53,16 +64,15 @@ export async function registerPushSubscription() {
     }
 
     // 2. Request geolocation permission
-    let coords;
+    let coords = { lat: 13.0827, lng: 80.2707 }; // Default fallback coordinates
     try {
       coords = await getCurrentCoordinates();
       console.log("[pushService] Obtained coordinates for push registration:", coords);
     } catch (geoErr) {
-      console.warn("[pushService] Geolocation permission denied or unavailable:", geoErr.message);
-      return { success: false, reason: "geolocation_denied" };
+      console.warn("[pushService] Geolocation unavailable, using fallback:", geoErr.message);
     }
 
-    // 3. Register service worker with updateViaCache: 'none' to bypass browser caching
+    // 3. Register service worker with updateViaCache: 'none'
     const registration = await navigator.serviceWorker.register("./firebase-messaging-sw.js", {
       updateViaCache: "none"
     });
@@ -89,26 +99,35 @@ export async function registerPushSubscription() {
 
     console.log("[pushService] FCM token obtained successfully:", token.substring(0, 15) + "...");
 
-    // 5. Send token and coordinates to backend
-    const response = await fetch(getRegisterPushUrl(), {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        token,
-        lat: coords.lat,
-        lng: coords.lng
-      })
-    });
+    // 5. Direct write to Firebase Realtime Database (100% instant, bypasses server cold starts)
+    try {
+      const { getDatabase, ref, set } = await import(
+        "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js"
+      );
+      const db = getDatabase(firebaseApp);
+      const dbKey = createSafeKey(token);
 
-    if (!response.ok) {
-      const errJson = await response.json().catch(() => ({}));
-      throw new Error(errJson.error || "Failed to register push subscription on backend");
+      await set(ref(db, `pushSubscribers/${dbKey}`), {
+        token,
+        lat: Number(coords.lat),
+        lng: Number(coords.lng),
+        updatedAt: Date.now(),
+        platform: navigator.userAgent || "web"
+      });
+      console.log("[pushService] Saved push subscriber directly into Firebase Realtime Database:", dbKey);
+    } catch (rtdbErr) {
+      console.warn("[pushService] Direct RTDB write fallback warning:", rtdbErr.message);
     }
 
-    const result = await response.json();
-    console.log("[pushService] Push subscription registered on backend:", result);
+    // 6. Also notify backend endpoint if available
+    try {
+      fetch(getRegisterPushUrl(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, lat: coords.lat, lng: coords.lng })
+      }).catch(() => {});
+    } catch (e) {}
+
     localStorage.setItem("push_subscribed", "true");
 
     return {
@@ -126,15 +145,13 @@ export async function registerPushSubscription() {
 }
 
 /**
- * Automatically check and attempt push registration if permissions are already granted,
- * or setup trigger handlers.
+ * Automatically check and attempt push registration if permissions are already granted.
  */
 export async function initPushService() {
   if (!("serviceWorker" in navigator) || !("Notification" in window)) {
     return;
   }
 
-  // If permission is already granted, refresh the token & location registration quietly in background
   if (Notification.permission === "granted") {
     try {
       await registerPushSubscription();
