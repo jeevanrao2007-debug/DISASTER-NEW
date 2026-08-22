@@ -78,6 +78,27 @@
 </div>
 
 <!-- ========================================================
+   FLOATING POCKET ALERT & VIBRATION BAR (MAIN SCREEN)
+   ======================================================== -->
+<div id="pocketAlertBar" class="pocket-alert-bar">
+  <div class="pab-left">
+    <div class="pab-icon">📳</div>
+    <div class="pab-info">
+      <strong id="pabTitle">Lock-Screen Pocket Alerts</strong>
+      <span id="pabSubtitle">6-Sec SOS vibration when phone is locked</span>
+    </div>
+  </div>
+  <div class="pab-actions">
+    <button type="button" id="pabEnableBtn" class="pab-enable-btn" onclick="window.handleEnablePush()">
+      Enable Push
+    </button>
+    <button type="button" id="pabTestBtn" class="pab-test-btn" onclick="window.testDeviceVibration()" title="Test 6-sec vibration">
+      ⚡ Test
+    </button>
+  </div>
+</div>
+
+<!-- ========================================================
    SEVERITY MAP LEGEND
    ======================================================== -->
 <div class="legend" role="region" aria-label="Alert Severity Legend">
@@ -201,8 +222,13 @@
   // Direct Push Registration Handler
   window.handleEnablePush = async () => {
     const btn = document.getElementById("enablePushBtn");
+    const pabBtn = document.getElementById("pabEnableBtn");
+    const pabBar = document.getElementById("pocketAlertBar");
+    const pabTitle = document.getElementById("pabTitle");
     const badge = document.getElementById("pushStatusBadge");
+
     if (btn) { btn.disabled = true; btn.textContent = "Connecting..."; }
+    if (pabBtn) { pabBtn.disabled = true; pabBtn.textContent = "Connecting..."; }
     if (badge) { badge.style.color = "#94a3b8"; badge.textContent = "Requesting notification & GPS permissions..."; }
 
     try {
@@ -211,15 +237,20 @@
 
       if (res.success) {
         if (btn) { btn.textContent = "✔ Enabled"; btn.style.background = "linear-gradient(135deg,#16a34a,#15803d)"; }
+        if (pabBtn) { pabBtn.textContent = "✔ Active"; pabBtn.style.background = "linear-gradient(135deg,#16a34a,#15803d)"; }
+        if (pabBar) pabBar.classList.add("enabled");
+        if (pabTitle) pabTitle.textContent = "✔ Pocket Alerts & Vibration Active";
         if (badge) { badge.style.color = "#86efac"; badge.textContent = "✔ Registered! Your phone will vibrate on critical alerts."; }
         // Test a short pulse to confirm
         if ("vibrate" in navigator) navigator.vibrate([200, 100, 200]);
       } else {
         if (btn) { btn.disabled = false; btn.textContent = "Retry"; }
+        if (pabBtn) { pabBtn.disabled = false; pabBtn.textContent = "Retry"; }
         if (badge) { badge.style.color = "#fca5a5"; badge.textContent = `⚠ ${res.reason || res.error || "Permission required"}`; }
       }
     } catch (err) {
       if (btn) { btn.disabled = false; btn.textContent = "Retry"; }
+      if (pabBtn) { pabBtn.disabled = false; pabBtn.textContent = "Retry"; }
       if (badge) { badge.style.color = "#fca5a5"; badge.textContent = `⚠ Error: ${err.message}`; }
     }
   };

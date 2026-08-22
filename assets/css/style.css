@@ -2841,3 +2841,154 @@ button:active { transform:scale(.96); }
     display: none; /* Accessible via tap or panel on tiny screens */
   }
 }
+
+/* =========================================================
+   FLOATING POCKET ALERT & VIBRATION CONTROLLER BAR
+   ========================================================= */
+.pocket-alert-bar {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  width: min(520px, calc(100vw - 24px));
+  background: rgba(10, 15, 30, 0.94);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1.5px solid rgba(220, 38, 38, 0.45);
+  border-radius: 16px;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.7), 0 0 24px rgba(220, 38, 38, 0.2);
+  transition: all 0.3s ease;
+}
+
+.pocket-alert-bar.enabled {
+  border-color: rgba(34, 197, 94, 0.5);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.7), 0 0 24px rgba(34, 197, 94, 0.2);
+}
+
+.pab-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.pab-icon {
+  font-size: 22px;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: rgba(220, 38, 38, 0.15);
+  border: 1px solid rgba(220, 38, 38, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  animation: vibe-shake 2.5s ease-in-out infinite;
+}
+
+.pocket-alert-bar.enabled .pab-icon {
+  background: rgba(34, 197, 94, 0.15);
+  border-color: rgba(34, 197, 94, 0.35);
+  animation: none;
+}
+
+@keyframes vibe-shake {
+  0%, 100% { transform: rotate(0); }
+  10%, 30% { transform: rotate(-8deg); }
+  20%, 40% { transform: rotate(8deg); }
+  50% { transform: rotate(0); }
+}
+
+.pab-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.pab-info strong {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #f8fafc;
+  line-height: 1.2;
+}
+
+.pab-info span {
+  font-size: 10.5px;
+  color: #94a3b8;
+  line-height: 1.2;
+}
+
+.pab-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.pab-enable-btn {
+  background: linear-gradient(135deg, #dc2626, #b91c1c);
+  color: white;
+  border: none;
+  font-family: var(--font-heading);
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+  box-shadow: 0 4px 14px rgba(220, 38, 38, 0.4);
+}
+
+.pab-enable-btn:hover {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  transform: translateY(-1px);
+}
+
+.pab-test-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #cbd5e1;
+  font-family: var(--font-heading);
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+
+.pab-test-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+}
+
+@media (max-width: 768px) {
+  .pocket-alert-bar {
+    bottom: 12px;
+    padding: 8px 10px;
+    gap: 8px;
+  }
+
+  .pab-info span {
+    display: none;
+  }
+
+  .pab-enable-btn {
+    padding: 7px 10px;
+    font-size: 11px;
+  }
+
+  .pab-test-btn {
+    padding: 7px 8px;
+    font-size: 11px;
+  }
+}
