@@ -5,6 +5,7 @@ import { addActivity } from "./ui/activityModule.js";
 import { showNearbyResourcesForAlert } from "./ui/resourcesPanel.js";
 import { listenForAlerts } from "./services/alertService.js";
 import { subscribeUser, isSubscribed } from "./services/notificationService.js";
+import { initPushService, registerPushSubscription } from "./services/pushService.js";
 import {
   initLanguage,
   setupLanguageToggle,
@@ -42,6 +43,7 @@ initLanguage();
 setupLanguageToggle();
 applyDocumentTranslations();
 setupAudioUnlock();
+initPushService();
 
 let heartbeatTimer;
 function bumpHeartbeat() {
@@ -164,6 +166,8 @@ if (isSubscribed()) {
 window.openSubscribeModal = () => {
   overlay?.classList.add("open");
   document.getElementById("subEmail")?.focus();
+  // Prompt for push & location in the background if not yet requested
+  registerPushSubscription().catch(() => {});
 };
 
 window.closeSubscribeModal = () => {
@@ -203,6 +207,9 @@ window.handleSubscribe = async () => {
     subResult.textContent = "";
     subResult.className = "sub-result";
   }
+
+  // Also ensure push subscription is attempted
+  registerPushSubscription().catch(() => {});
 
   const { success, message } = await subscribeUser({ email });
 

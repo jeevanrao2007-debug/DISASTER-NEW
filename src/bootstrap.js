@@ -30,6 +30,7 @@ const functionsBaseUrl =
 window.DISASTER_ALERT_CONFIG = firebaseConfig;
 window.DISASTER_ALERT_FUNCTIONS = Object.freeze({
   register: runtimeOverrides.functions?.register || `${functionsBaseUrl}/register`,
+  registerPush: runtimeOverrides.functions?.registerPush || `${functionsBaseUrl}/registerPush`,
   dispatchAlert: runtimeOverrides.functions?.dispatchAlert || `${functionsBaseUrl}/dispatchAlert`,
   aiAdvisor: runtimeOverrides.functions?.aiAdvisor || `${functionsBaseUrl}/aiAdvisor`,
   nearbyResources: runtimeOverrides.functions?.nearbyResources || `${functionsBaseUrl}/nearbyResources`

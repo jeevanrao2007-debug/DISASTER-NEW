@@ -1,9 +1,18 @@
 import express from "express";
 import cors from "cors";
+import crypto from "crypto";
 import * as SibApiV3Sdk from "@getbrevo/brevo";
-import { getAdminDb, verifyFirebaseAuthToken } from "./helpers/firebaseAdmin.js";
+import { getAdminDb, getAdminMessaging, verifyFirebaseAuthToken } from "./helpers/firebaseAdmin.js";
 import { haversineKm } from "./helpers/geo.js";
 import { reverseGeocode } from "./helpers/geocode.js";
+import { config, validateConfig } from "./helpers/config.js";
+import { initAlertSyncListener } from "./helpers/syncService.js";
+
+// Run secure configuration checks
+validateConfig();
+
+// Initialize real-time CrisisMesh sync ingestion
+initAlertSyncListener();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -83,6 +92,54 @@ app.post("/register", async (req, res) => {
     res.status(500).json({
       success: false,
       error: "Failed to subscribe"
+    });
+  }
+});
+
+// POST /registerPush
+app.post("/registerPush", async (req, res) => {
+  const { token, lat, lng } = req.body || {};
+
+  if (!token || typeof token !== "string" || !token.trim()) {
+    res.status(400).json({ success: false, error: "Valid FCM token is required" });
+    return;
+  }
+
+  const numLat = Number(lat);
+  const numLng = Number(lng);
+
+  if (!Number.isFinite(numLat) || numLat < -90 || numLat > 90 ||
+      !Number.isFinite(numLng) || numLng < -180 || numLng > 180) {
+    res.status(400).json({ success: false, error: "Valid latitude (-90 to 90) and longitude (-180 to 180) are required" });
+    return;
+  }
+
+  try {
+    const db = getAdminDb();
+    // SHA-256 hash token to create a safe, valid RTDB key and avoid duplicates
+    const tokenKey = crypto.createHash("sha256").update(token.trim()).digest("hex");
+    const subscriberRef = db.ref(`pushSubscribers/${tokenKey}`);
+
+    const record = {
+      token: token.trim(),
+      lat: numLat,
+      lng: numLng,
+      updatedAt: Date.now()
+    };
+
+    await subscriberRef.set(record);
+    console.log(`[registerPush] Registered push subscriber at lat=${numLat}, lng=${numLng}`);
+
+    res.status(200).json({
+      success: true,
+      message: "Push notification subscription registered successfully",
+      record
+    });
+  } catch (error) {
+    console.error("[registerPush] Error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to register push subscription"
     });
   }
 });
@@ -168,84 +225,68 @@ app.post("/dispatchAlert", async (req, res) => {
     )];
 
     console.log("[dispatchAlert] Unique recipients:", recipients.length, recipients);
-
-    if (recipients.length === 0) {
-      res.status(200).json({
-        success: true,
-        dispatchedBy: decodedToken.email || decodedToken.uid || "unknown",
-        alert,
-        message: "No subscribers to email.",
-        sent: 0,
-        failed: 0
-      });
-      return;
-    }
-
-    // Validate each recipient address before attempting to send — a malformed
-    // entry in the DB (e.g. accidental whitespace or partial save) should be
-    // skipped and logged rather than crashing the whole batch.
-    const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    let sent = 0;
+    let failed = 0;
+    const errors = [];
     const validRecipients = [];
     const invalidRecipients = [];
-    for (const email of recipients) {
-      if (EMAIL_RE.test(email)) {
-        validRecipients.push(email);
-      } else {
-        invalidRecipients.push(email);
+
+    if (recipients.length > 0) {
+      // Validate each recipient address before attempting to send — a malformed
+      // entry in the DB (e.g. accidental whitespace or partial save) should be
+      // skipped and logged rather than crashing the whole batch.
+      const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      for (const email of recipients) {
+        if (EMAIL_RE.test(email)) {
+          validRecipients.push(email);
+        } else {
+          invalidRecipients.push(email);
+        }
       }
+
+      if (invalidRecipients.length > 0) {
+        console.warn("[dispatchAlert] Skipping malformed recipient addresses:", invalidRecipients);
+      }
+    } else {
+      console.log("[dispatchAlert] No email subscribers found in database.");
     }
-
-    if (invalidRecipients.length > 0) {
-      console.warn("[dispatchAlert] Skipping malformed recipient addresses:", invalidRecipients);
-    }
-
-    if (validRecipients.length === 0) {
-      res.status(200).json({
-        success: true,
-        dispatchedBy: decodedToken.email || decodedToken.uid || "unknown",
-        alert,
-        message: "No valid subscriber addresses to email.",
-        sent: 0,
-        failed: 0,
-        skipped: invalidRecipients.length
-      });
-      return;
-    }
-
-    const emailSubject = `🚨 ${alert.type} Alert — ${alert.level} Severity`;
-
-    // Severity-based color palette (inline for email client compatibility)
-    const severityKey = (alert.severity || alert.level || "").toLowerCase();
-    const palette = severityKey.includes("critical")
-      ? { accent: "#b91c1c", accentLight: "#fef2f2", accentBorder: "#fca5a5", badge: "#dc2626", badgeText: "#ffffff", icon: "🔴" }
-      : severityKey.includes("high")
-      ? { accent: "#c2410c", accentLight: "#fff7ed", accentBorder: "#fdba74", badge: "#ea580c", badgeText: "#ffffff", icon: "🟠" }
-      : severityKey.includes("moderate") || severityKey.includes("medium")
-      ? { accent: "#b45309", accentLight: "#fffbeb", accentBorder: "#fcd34d", badge: "#d97706", badgeText: "#ffffff", icon: "🟡" }
-      : { accent: "#1d4ed8", accentLight: "#eff6ff", accentBorder: "#93c5fd", badge: "#2563eb", badgeText: "#ffffff", icon: "🔵" };
 
     const DASHBOARD_URL = "https://disaster-alert-50aae.web.app";
 
-    const emailBody = [
-      "DISASTER ALERT SYSTEM",
-      "=".repeat(40),
-      "",
-      `⚠️  ${alert.type.toUpperCase()} ALERT`,
-      "",
-      `Severity   : ${alert.level}`,
-      `Location   : ${alert.location}`,
-      `Description: ${alert.description}`,
-      "",
-      "─".repeat(40),
-      `View on Dashboard: ${DASHBOARD_URL}`,
-      "─".repeat(40),
-      "",
-      "Stay safe. Take immediate precautions.",
-      "",
-      "You are receiving this because you subscribed to Disaster Alert System notifications.",
-    ].join("\n");
+    if (validRecipients.length > 0) {
+      const emailSubject = `🚨 ${alert.type} Alert — ${alert.level} Severity`;
 
-    const emailHtml = `<!DOCTYPE html>
+      // Severity-based color palette (inline for email client compatibility)
+      const severityKey = (alert.severity || alert.level || "").toLowerCase();
+      const palette = severityKey.includes("critical")
+        ? { accent: "#b91c1c", accentLight: "#fef2f2", accentBorder: "#fca5a5", badge: "#dc2626", badgeText: "#ffffff", icon: "🔴" }
+        : severityKey.includes("high")
+        ? { accent: "#c2410c", accentLight: "#fff7ed", accentBorder: "#fdba74", badge: "#ea580c", badgeText: "#ffffff", icon: "🟠" }
+        : severityKey.includes("moderate") || severityKey.includes("medium")
+        ? { accent: "#b45309", accentLight: "#fffbeb", accentBorder: "#fcd34d", badge: "#d97706", badgeText: "#ffffff", icon: "🟡" }
+        : { accent: "#1d4ed8", accentLight: "#eff6ff", accentBorder: "#93c5fd", badge: "#2563eb", badgeText: "#ffffff", icon: "🔵" };
+
+      const emailBody = [
+        "DISASTER ALERT SYSTEM",
+        "=".repeat(40),
+        "",
+        `⚠️  ${alert.type.toUpperCase()} ALERT`,
+        "",
+        `Severity   : ${alert.level}`,
+        `Location   : ${alert.location}`,
+        `Description: ${alert.description}`,
+        "",
+        "─".repeat(40),
+        `View on Dashboard: ${DASHBOARD_URL}`,
+        "─".repeat(40),
+        "",
+        "",
+        "Stay safe. Take immediate precautions.",
+        "",
+        "You are receiving this because you subscribed to Disaster Alert System notifications.",
+      ].join("\n");
+
+      const emailHtml = `<!DOCTYPE html>
 <html lang="en">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body style="margin:0;padding:0;background-color:#f3f4f6;font-family:'Segoe UI',Arial,sans-serif;">
@@ -357,50 +398,129 @@ app.post("/dispatchAlert", async (req, res) => {
 </body>
 </html>`;
 
-    console.log("=== SENDING VIA BREVO === htmlContent length:", emailHtml.length, "first 200 chars:", emailHtml.substring(0, 200));
-    console.log("[dispatchAlert] BREVO_SENDER_EMAIL:", BREVO_SENDER_EMAIL);
+      console.log("=== SENDING VIA BREVO === htmlContent length:", emailHtml.length, "first 200 chars:", emailHtml.substring(0, 200));
+      console.log("[dispatchAlert] BREVO_SENDER_EMAIL:", BREVO_SENDER_EMAIL);
 
-    const settled = await Promise.allSettled(
-      validRecipients.map((recipientEmail) =>
-        brevoEmailApi.sendTransacEmail({
-          sender: { email: BREVO_SENDER_EMAIL, name: BREVO_SENDER_NAME },
-          to: [{ email: recipientEmail }],
-          subject: emailSubject,
-          htmlContent: emailHtml,
-          textContent: emailBody
-        })
-      )
-    );
+      const settled = await Promise.allSettled(
+        validRecipients.map((recipientEmail) =>
+          brevoEmailApi.sendTransacEmail({
+            sender: { email: BREVO_SENDER_EMAIL, name: BREVO_SENDER_NAME },
+            to: [{ email: recipientEmail }],
+            subject: emailSubject,
+            htmlContent: emailHtml,
+            textContent: emailBody
+          })
+        )
+      );
 
-    let sent = 0;
-    let failed = 0;
-    const errors = [];
-
-    settled.forEach((result, idx) => {
-      console.log(`=== BREVO RESPONSE [recipient: ${validRecipients[idx]}] ===`, JSON.stringify(result));
-      if (result.status === "fulfilled") {
-        sent++;
-      } else {
-        failed++;
-        const errMsg = result.reason?.message || String(result.reason);
-        console.error(`[dispatchAlert] Failed to send to ${validRecipients[idx]}:`, errMsg);
-        errors.push({ email: validRecipients[idx], error: errMsg });
-      }
-    });
-
-    console.log(`[dispatchAlert] Brevo email results: sent=${sent}, failed=${failed}, skipped=${invalidRecipients.length}`);
-
-    if (sent === 0 && failed > 0) {
-      res.status(502).json({
-        success: false,
-        error: `Failed to deliver emails via Brevo: ${errors[0]?.error || "API failure"}`,
-        sent,
-        failed,
-        skipped: invalidRecipients.length,
-        errors
+      settled.forEach((result, idx) => {
+        console.log(`=== BREVO RESPONSE [recipient: ${validRecipients[idx]}] ===`, JSON.stringify(result));
+        if (result.status === "fulfilled") {
+          sent++;
+        } else {
+          failed++;
+          const errMsg = result.reason?.message || String(result.reason);
+          console.error(`[dispatchAlert] Failed to send to ${validRecipients[idx]}:`, errMsg);
+          errors.push({ email: validRecipients[idx], error: errMsg });
+        }
       });
-      return;
+
+      console.log(`[dispatchAlert] Brevo email results: sent=${sent}, failed=${failed}, skipped=${invalidRecipients.length}`);
     }
+
+    // -------------------------------------------------------------------------
+    // Geofenced FCM Push Notifications (within PUSH_RADIUS_KM)
+    // -------------------------------------------------------------------------
+    const PUSH_RADIUS_KM = 20;
+    let pushSent = 0;
+    let pushFailed = 0;
+    const pushErrors = [];
+    let pushEligibleCount = 0;
+
+    if (alert.lat !== null && alert.lng !== null) {
+      console.log(`=== INITIATING GEOFENCED PUSH NOTIFICATIONS (Radius: ${PUSH_RADIUS_KM}km, Alert Lat=${alert.lat}, Lng=${alert.lng}) ===`);
+      try {
+        const pushSnapshot = await db.ref("pushSubscribers").once("value");
+        const pushData = pushSnapshot.val() || {};
+        const pushSubscribers = Object.entries(pushData).map(([key, value]) => ({
+          dbKey: key,
+          ...value
+        }));
+
+        console.log(`[dispatchAlert:Push] Found ${pushSubscribers.length} total push subscribers registered in RTDB.`);
+
+        const inRangeSubscribers = pushSubscribers.filter((sub) => {
+          if (!sub.token || typeof sub.lat !== "number" || typeof sub.lng !== "number") {
+            return false;
+          }
+          const dist = haversineKm(alert.lat, alert.lng, sub.lat, sub.lng);
+          return dist <= PUSH_RADIUS_KM;
+        });
+
+        pushEligibleCount = inRangeSubscribers.length;
+        console.log(`[dispatchAlert:Push] ${pushEligibleCount} subscribers within ${PUSH_RADIUS_KM}km radius.`);
+
+        if (pushEligibleCount > 0) {
+          const messaging = getAdminMessaging();
+
+          for (const sub of inRangeSubscribers) {
+            const payload = {
+              notification: {
+                title: `🚨 ${alert.type} Alert Nearby`,
+                body: alert.description || `${alert.type} emergency reported in your area.`
+              },
+              webpush: {
+                notification: {
+                  vibrate: [200, 100, 200, 100, 200],
+                  icon: "/favicon.ico",
+                  badge: "/favicon.ico"
+                },
+                fcmOptions: {
+                  link: DASHBOARD_URL
+                }
+              },
+              data: {
+                type: String(alert.type || ""),
+                severity: String(alert.severity || alert.level || ""),
+                location: String(alert.location || ""),
+                lat: String(alert.lat ?? ""),
+                lng: String(alert.lng ?? "")
+              },
+              token: sub.token
+            };
+
+            try {
+              const fcmResponse = await messaging.send(payload);
+              console.log(`[dispatchAlert:Push] Successfully sent FCM push to subscriber (key=${sub.dbKey}):`, fcmResponse);
+              pushSent++;
+            } catch (fcmErr) {
+              pushFailed++;
+              const errMsg = fcmErr.message || String(fcmErr);
+              console.error(`[dispatchAlert:Push] FCM send failed for subscriber (key=${sub.dbKey}):`, errMsg);
+              pushErrors.push({ tokenKey: sub.dbKey, error: errMsg });
+
+              // Automatically clean up invalid/expired tokens
+              if (
+                fcmErr.code === "messaging/registration-token-not-registered" ||
+                fcmErr.code === "messaging/invalid-registration-token" ||
+                /not-registered|invalid-registration-token|invalid argument/i.test(errMsg)
+              ) {
+                console.log(`[dispatchAlert:Push] Removing invalid/unregistered token from database: ${sub.dbKey}`);
+                await db.ref(`pushSubscribers/${sub.dbKey}`).remove().catch((cleanupErr) => {
+                  console.warn(`[dispatchAlert:Push] Failed to remove bad token ${sub.dbKey}:`, cleanupErr.message);
+                });
+              }
+            }
+          }
+        }
+      } catch (pushErr) {
+        console.error("[dispatchAlert:Push] Unexpected error during push dispatch:", pushErr);
+      }
+    } else {
+      console.log("[dispatchAlert:Push] Alert has no coordinates; skipping geofenced push dispatch.");
+    }
+
+    console.log(`[dispatchAlert] Summary: emailSent=${sent}, emailFailed=${failed}, pushSent=${pushSent}, pushFailed=${pushFailed}`);
 
     res.status(200).json({
       success: true,
@@ -409,7 +529,11 @@ app.post("/dispatchAlert", async (req, res) => {
       sent,
       failed,
       skipped: invalidRecipients.length,
-      errors: errors.length > 0 ? errors : undefined
+      errors: errors.length > 0 ? errors : undefined,
+      pushSent,
+      pushFailed,
+      pushEligible: pushEligibleCount,
+      pushErrors: pushErrors.length > 0 ? pushErrors : undefined
     });
   } catch (error) {
     const status = /Authorization|token/i.test(error.message) ? 401 : 500;
@@ -552,12 +676,13 @@ app.post("/aiAdvisor", async (req, res) => {
 
 // Helpers for nearbyResources (Overpass OpenStreetMap API)
 const OVERPASS_ENDPOINTS = [
-  "https://overpass-api.de/api/interpreter",
   "https://overpass.kumi.systems/api/interpreter",
-  "https://overpass.nchc.org.tw/api/interpreter"
+  "https://overpass-api.de/api/interpreter",
+  "https://overpass.nchc.org.tw/api/interpreter",
+  "https://lz4.overpass-api.de/api/interpreter"
 ];
 
-const CACHE_TTL_MS = 5 * 60 * 1000;
+const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes static infrastructure cache
 const DEFAULT_RADIUS_METERS = 5000;
 const MIN_RADIUS_METERS = 500;
 const MAX_RADIUS_METERS = 10000;
@@ -576,7 +701,8 @@ function clampRadius(value) {
 }
 
 function cacheKey(lat, lng, radius) {
-  return `${lat.toFixed(4)}:${lng.toFixed(4)}:${radius}`;
+  // Bucketing to ~110m precision for instant cache hits across nearby alerts
+  return `${lat.toFixed(3)}:${lng.toFixed(3)}:${radius}`;
 }
 
 function getOverpassKind(tags = {}) {
@@ -631,52 +757,65 @@ function toOverpassPlace(elem, targetLat, targetLng) {
   };
 }
 
-async function fetchOverpassResources(lat, lng, radius, timeoutMs = 9000) {
+async function fetchOverpassResources(lat, lng, radius, timeoutMs = 6000) {
+  // Precompute geographic bounding box for instant index lookup
+  const latDelta = (radius / 1000) / 111.0;
+  const lngDelta = (radius / 1000) / (111.0 * Math.cos((lat * Math.PI) / 180));
+  const minLat = (lat - latDelta).toFixed(4);
+  const minLng = (lng - lngDelta).toFixed(4);
+  const maxLat = (lat + latDelta).toFixed(4);
+  const maxLng = (lng + lngDelta).toFixed(4);
+
+  // High-performance BBox-indexed Overpass query
   const query = `
-    [out:json][timeout:10];
+    [out:json][timeout:5];
     (
-      node["amenity"="hospital"](around:${radius},${lat},${lng});
-      way["amenity"="hospital"](around:${radius},${lat},${lng});
-      node["amenity"="police"](around:${radius},${lat},${lng});
-      way["amenity"="police"](around:${radius},${lat},${lng});
-      node["amenity"="shelter"](around:${radius},${lat},${lng});
-      way["amenity"="shelter"](around:${radius},${lat},${lng});
-      node["building"="shelter"](around:${radius},${lat},${lng});
-      way["building"="shelter"](around:${radius},${lat},${lng});
+      node["amenity"="hospital"](${minLat},${minLng},${maxLat},${maxLng});
+      node["amenity"="police"](${minLat},${minLng},${maxLat},${maxLng});
+      node["amenity"="shelter"](${minLat},${minLng},${maxLat},${maxLng});
+      node["healthcare"="hospital"](${minLat},${minLng},${maxLat},${maxLng});
+      way["amenity"="hospital"](${minLat},${minLng},${maxLat},${maxLng});
+      way["amenity"="police"](${minLat},${minLng},${maxLat},${maxLng});
+      way["amenity"="shelter"](${minLat},${minLng},${maxLat},${maxLng});
+      way["building"="shelter"](${minLat},${minLng},${maxLat},${maxLng});
     );
-    out center body;
+    out center 20;
   `;
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  // Race all public mirrors concurrently - first responding mirror wins
+  const fetchFromMirror = async (endpoint) => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const response = await fetch(endpoint, {
+        method: "POST",
+        signal: controller.signal,
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "User-Agent": "DisasterAlertSystem/1.0 (contact: disaster-alert@alpha.local)"
+        },
+        body: "data=" + encodeURIComponent(query)
+      });
+
+      if (!response.ok) {
+        throw new Error(`Mirror ${endpoint} HTTP ${response.status}`);
+      }
+
+      const data = await response.json();
+      if (!Array.isArray(data?.elements)) {
+        throw new Error(`Invalid response structure from ${endpoint}`);
+      }
+      return data.elements;
+    } finally {
+      clearTimeout(timer);
+    }
+  };
 
   try {
-    for (const endpoint of OVERPASS_ENDPOINTS) {
-      try {
-        const response = await fetch(endpoint, {
-          method: "POST",
-          signal: controller.signal,
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded",
-            "User-Agent": "DisasterAlertSystem/1.0 (contact: otcwwe1212@gmail.com)"
-          },
-          body: "data=" + encodeURIComponent(query)
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          return Array.isArray(data.elements) ? data.elements : [];
-        }
-      } catch (err) {
-        if (err.name === "AbortError") {
-          throw err;
-        }
-        console.warn(`[overpass] Endpoint ${endpoint} failed:`, err.message);
-      }
-    }
+    return await Promise.any(OVERPASS_ENDPOINTS.map((ep) => fetchFromMirror(ep)));
+  } catch (aggErr) {
+    console.warn("[overpass] All mirrors failed or timed out:", aggErr?.message || aggErr);
     return [];
-  } finally {
-    clearTimeout(timer);
   }
 }
 

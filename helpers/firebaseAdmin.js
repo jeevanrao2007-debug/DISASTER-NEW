@@ -78,6 +78,8 @@ export function getAdminMessaging() {
   return getMessaging(initializeFirebaseAdmin());
 }
 
+export { getAdminMessaging as getMessaging };
+
 export async function verifyFirebaseAuthToken(authHeader) {
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
     throw new Error("Missing or invalid Authorization header");

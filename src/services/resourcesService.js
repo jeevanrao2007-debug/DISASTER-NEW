@@ -1,4 +1,4 @@
-const CACHE_TTL_MS = 2 * 60 * 1000;
+const CACHE_TTL_MS = 15 * 60 * 1000;
 const cache = new Map();
 
 function toNumber(value) {
@@ -7,7 +7,7 @@ function toNumber(value) {
 }
 
 function cacheKey(lat, lng, radius) {
-  return `${lat.toFixed(4)}:${lng.toFixed(4)}:${radius}`;
+  return `${lat.toFixed(3)}:${lng.toFixed(3)}:${radius}`;
 }
 
 function getNearbyResourcesUrl() {
