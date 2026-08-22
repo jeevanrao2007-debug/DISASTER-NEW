@@ -1,38 +1,61 @@
 /* =========================================================
    CRISIS COMMAND CENTER — GLOBAL DESIGN SYSTEM
-   Mission-Control Emergency Aesthetic
+   Mission-Control Emergency Aesthetic (Glassmorphic)
    All tokens, utilities, and shared components
    ========================================================= */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 /* ── CSS TOKENS ─────────────────────────────────────────── */
 :root {
   /* Background scale — deeper near-black with blue-black cast */
   --bg-void:      #03040a;
   --bg-deep:      #050813;
-  --bg-panel:     rgba(3,4,12,0.94);
-  --bg-card:      rgba(10,14,30,0.88);
-  --bg-hover:     rgba(20,28,50,0.75);
+  --bg-panel:     rgba(8, 12, 28, 0.92);
+  --bg-card:      rgba(13, 18, 38, 0.88);
+  --bg-hover:     rgba(24, 34, 64, 0.8);
 
   /* Red — primary crisis accent */
   --red:          #dc2626;
   --red-bright:   #ef4444;
   --red-dim:      #b91c1c;
-  --red-glow:     rgba(220,38,38,0.35);
-  --red-glow-sm:  rgba(220,38,38,0.18);
+  --red-glow:     rgba(220, 38, 38, 0.4);
+  --red-glow-sm:  rgba(220, 38, 38, 0.2);
 
   /* Amber — warning accent */
   --amber:        #f59e0b;
   --amber-bright: #fbbf24;
-  --amber-glow:   rgba(245,158,11,0.35);
+  --amber-glow:   rgba(245, 158, 11, 0.35);
 
-  /* Blue — kept for non-emergency actions (Subscribe, AI panel, etc.) */
+  /* Blue & Cyan — non-emergency actions */
   --blue:         #3b82f6;
   --blue-dim:     #1d4ed8;
-  --blue-glow:    rgba(59,130,246,0.25);
-  --cyan:         #06b6d4;
-  --cyan-glow:    rgba(6,182,212,0.2);
+  --blue-glow:    rgba(59, 130, 246, 0.3);
+  --cyan:         #38bdf8;
+  --cyan-glow:    rgba(56, 189, 248, 0.25);
+
+  /* Severity */
+  --low:          #22c55e;
+  --moderate:     #facc15;
+  --high:         #fb923c;
+  --critical:     #ef4444;
+  --low-glow:     rgba(34, 197, 94, 0.35);
+  --moderate-glow:rgba(250, 204, 21, 0.35);
+  --high-glow:    rgba(251, 146, 60, 0.35);
+  --critical-glow:rgba(239, 68, 68, 0.45);
+
+  /* Borders */
+  --border:       rgba(255, 255, 255, 0.08);
+  --border-bright:rgba(220, 38, 38, 0.35);
+  --border-blue:  rgba(56, 189, 248, 0.35);
+
+  /* Typography */
+  --font-sans:    'Inter', system-ui, -apple-system, sans-serif;
+  --font-heading: 'Outfit', var(--font-sans);
+  --font-mono:    'JetBrains Mono', monospace;
+  --text-primary: #f8fafc;
+  --text-muted:   #94a3b8;
+  --text-dim:     #64748b;
 
   /* Severity */
   --low:          #22c55e;
@@ -2114,4 +2137,248 @@ button:active { transform:scale(.96); }
     bottom: 84px;
     right: 14px;
   }
+}
+
+/* =========================================================
+   SOUND BANNER & MODAL DIALOG (GLASSMORPHIC UPGRADE)
+   ========================================================= */
+#soundBanner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 9999;
+  background: linear-gradient(90deg, #1e293b, #0f172a);
+  border-bottom: 2px solid #f59e0b;
+  color: #fef3c7;
+  text-align: center;
+  padding: 10px 16px;
+  font-family: var(--font-sans);
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  transition: opacity 0.4s, transform 0.4s;
+  animation: banner-pulse 2.5s ease-in-out infinite;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+#soundBanner.hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-100%);
+}
+
+#soundBanner .sb-icon {
+  font-size: 18px;
+  animation: bell-shake 1.4s ease-in-out infinite;
+}
+
+@keyframes banner-pulse {
+  0%, 100% { box-shadow: 0 2px 12px rgba(245, 158, 11, 0.25); }
+  50% { box-shadow: 0 2px 28px rgba(245, 158, 11, 0.6); }
+}
+
+@keyframes bell-shake {
+  0%, 100% { transform: rotate(0deg); }
+  20% { transform: rotate(-16deg); }
+  40% { transform: rotate(16deg); }
+  60% { transform: rotate(-8deg); }
+  80% { transform: rotate(8deg); }
+}
+
+#subscribeBtn {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.18), rgba(99, 102, 241, 0.18));
+  border: 1px solid rgba(99, 102, 241, 0.45);
+  color: #a5b4fc;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+  letter-spacing: 0.4px;
+}
+
+#subscribeBtn:hover {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.35), rgba(99, 102, 241, 0.35));
+  border-color: rgba(99, 102, 241, 0.7);
+  color: #c7d2fe;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.3);
+}
+
+#subscribeBtn.subscribed {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.18), rgba(16, 185, 129, 0.18));
+  border-color: rgba(34, 197, 94, 0.4);
+  color: #86efac;
+}
+
+#subModalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(3, 4, 12, 0.82);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+
+#subModalOverlay.open {
+  opacity: 1;
+  pointer-events: all;
+}
+
+#subModal {
+  background: linear-gradient(145deg, rgba(15, 23, 42, 0.95), rgba(8, 12, 28, 0.95));
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1.5px solid rgba(99, 102, 241, 0.4);
+  border-radius: 20px;
+  padding: 36px 32px;
+  width: min(440px, 92vw);
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.7), 0 0 50px rgba(99, 102, 241, 0.15);
+  transform: translateY(24px) scale(0.96);
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  position: relative;
+}
+
+#subModalOverlay.open #subModal {
+  transform: translateY(0) scale(1);
+}
+
+#subModal .modal-close {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #94a3b8;
+  font-size: 16px;
+  cursor: pointer;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  transition: all 0.2s;
+}
+
+#subModal .modal-close:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #fca5a5;
+}
+
+#subModal .modal-icon {
+  font-size: 44px;
+  text-align: center;
+  margin-bottom: 12px;
+}
+
+#subModal h2 {
+  margin: 0 0 6px;
+  font-family: var(--font-heading);
+  font-size: 22px;
+  font-weight: 700;
+  color: #f1f5f9;
+  text-align: center;
+  letter-spacing: -0.3px;
+}
+
+#subModal p {
+  margin: 0 0 22px;
+  font-size: 13px;
+  color: #94a3b8;
+  text-align: center;
+  line-height: 1.6;
+}
+
+#subModal label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  color: #cbd5e1;
+  margin-bottom: 7px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+
+#subModal input[type="email"] {
+  width: 100%;
+  box-sizing: border-box;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(99, 102, 241, 0.35);
+  border-radius: 10px;
+  color: #f1f5f9;
+  font-size: 14px;
+  padding: 12px 14px;
+  margin-bottom: 18px;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+#subModal input[type="email"]:focus {
+  border-color: rgba(99, 102, 241, 0.8);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+}
+
+#subModal input[type="email"]::placeholder {
+  color: #475569;
+}
+
+#subModal .sub-submit-btn {
+  width: 100%;
+  background: linear-gradient(135deg, #4f46e5, #6366f1);
+  border: none;
+  border-radius: 10px;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+  letter-spacing: 0.3px;
+}
+
+#subModal .sub-submit-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(79, 70, 229, 0.45);
+}
+
+#subModal .sub-submit-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+#subModal .sub-result {
+  margin-top: 14px;
+  font-size: 13px;
+  text-align: center;
+  min-height: 20px;
+  border-radius: 8px;
+  padding: 8px;
+}
+
+#subModal .sub-result.success {
+  background: rgba(34, 197, 94, 0.14);
+  color: #86efac;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+#subModal .sub-result.error {
+  background: rgba(239, 68, 68, 0.14);
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.3);
 }
