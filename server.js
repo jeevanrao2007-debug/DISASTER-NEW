@@ -464,44 +464,34 @@ app.post("/dispatchAlert", async (req, res) => {
           const messaging = getAdminMessaging();
 
           for (const sub of inRangeSubscribers) {
+            const pushTitle = `🚨 ${alert.type} Alert Nearby`;
+            const pushBody = alert.description || `${alert.type} emergency reported in your area. Take immediate precautions.`;
+
+            // Data-only payload ensures Android Chrome hands full control to our Service Worker
+            // without intercepting with the browser's default no-vibration notification handler.
             const payload = {
-              notification: {
-                title: `🚨 ${alert.type} Alert Nearby`,
-                body: alert.description || `${alert.type} emergency reported in your area.`
-              },
               webpush: {
                 headers: {
                   Urgency: "high",
                   TTL: "86400"
-                },
-                notification: {
-                  title: `🚨 ${alert.type} Alert Nearby`,
-                  body: alert.description || `${alert.type} emergency reported in your area. Take immediate precautions.`,
-                  vibrate: [500, 200, 500, 200, 500, 200, 1000, 300, 1000, 300, 1000],
-                  requireInteraction: true,
-                  renotify: true,
-                  tag: "critical-emergency-alert",
-                  icon: "/favicon.ico",
-                  badge: "/favicon.ico"
                 },
                 fcmOptions: {
                   link: DASHBOARD_URL
                 }
               },
               android: {
-                priority: "high",
-                notification: {
-                  priority: "max",
-                  defaultVibrateTimings: false,
-                  vibrateTimingsMillis: [500, 200, 500, 200, 500, 200, 1000, 300, 1000, 300, 1000]
-                }
+                priority: "high"
               },
               data: {
+                title: String(pushTitle),
+                body: String(pushBody),
                 type: String(alert.type || ""),
-                severity: String(alert.severity || alert.level || ""),
+                severity: String(alert.severity || alert.level || "critical"),
                 location: String(alert.location || ""),
                 lat: String(alert.lat ?? ""),
-                lng: String(alert.lng ?? "")
+                lng: String(alert.lng ?? ""),
+                url: String(DASHBOARD_URL),
+                alertId: String(alert.createdAt || Date.now())
               },
               token: sub.token
             };

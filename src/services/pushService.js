@@ -62,8 +62,10 @@ export async function registerPushSubscription() {
       return { success: false, reason: "geolocation_denied" };
     }
 
-    // 3. Register service worker
-    const registration = await navigator.serviceWorker.register("./firebase-messaging-sw.js");
+    // 3. Register service worker with updateViaCache: 'none' to bypass browser caching
+    const registration = await navigator.serviceWorker.register("./firebase-messaging-sw.js", {
+      updateViaCache: "none"
+    });
     await navigator.serviceWorker.ready;
 
     // 4. Initialize Firebase messaging & get token

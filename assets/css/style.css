@@ -2566,3 +2566,278 @@ button:active { transform:scale(.96); }
 .pwa-dismiss-btn:hover {
   color: #f1f5f9;
 }
+
+/* =========================================================
+   COMPREHENSIVE MOBILE RESPONSIVE DESIGN SYSTEM
+   Optimized for Android & iOS Phone Viewports (< 768px & < 480px)
+   ========================================================= */
+
+@media (max-width: 768px) {
+  :root {
+    --topbar-h: 54px;
+  }
+
+  /* ── 1. TOP NAVBAR (MOBILE) ── */
+  .topbar {
+    height: var(--topbar-h);
+    padding: 0 12px;
+    gap: 6px;
+  }
+
+  .topbar-brand {
+    font-size: 14px;
+    letter-spacing: 0.5px;
+    gap: 6px;
+  }
+
+  .topbar-right {
+    gap: 6px;
+  }
+
+  .live-chip {
+    padding: 2px 6px;
+    font-size: 10.5px;
+  }
+
+  .lang-toggle .lang-btn {
+    min-width: 28px;
+    height: 22px;
+    padding: 0 6px;
+    font-size: 10px;
+  }
+
+  #aiAdvisorBtn {
+    font-size: 11px;
+    padding: 5px 9px;
+  }
+
+  #subscribeBtn {
+    font-size: 11px;
+    padding: 5px 10px;
+  }
+
+  .authority-link {
+    font-size: 11px;
+    padding: 4px 8px;
+  }
+
+  /* ── 2. MAP & SAFE AREAS ── */
+  #map {
+    top: var(--topbar-h);
+    height: calc(100dvh - var(--topbar-h));
+    width: 100%;
+  }
+
+  /* ── 3. MAP CONTROLS & FLOATING BUTTONS ── */
+  .map-fab-container {
+    right: 12px;
+    bottom: 84px;
+    z-index: 950;
+  }
+
+  .map-fab-btn {
+    width: 42px;
+    height: 42px;
+    font-size: 17px;
+  }
+
+  /* ── 4. SEVERITY LEGEND (COMPACT TOP-RIGHT) ── */
+  .legend {
+    top: calc(var(--topbar-h) + 10px);
+    right: 10px;
+    left: auto;
+    bottom: auto;
+    padding: 8px 10px;
+    border-radius: 10px;
+    font-size: 11px;
+    z-index: 800;
+  }
+
+  /* ── 5. LIVE ACTIVITY FEED (COMPACT BOTTOM-LEFT) ── */
+  #activityPanel {
+    left: 10px;
+    bottom: 84px;
+    width: min(260px, calc(100vw - 80px));
+    max-height: 140px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    z-index: 850;
+  }
+
+  #activityPanel .live-feed-header {
+    font-size: 10px;
+    margin-bottom: 6px;
+  }
+
+  #activityPanel .activity-item {
+    font-size: 11px;
+    gap: 6px;
+    padding: 3px 0;
+  }
+
+  /* ── 6. NEARBY HELP PANEL (BOTTOM-SHEET LAYOUT) ── */
+  .nearby-panel {
+    position: fixed;
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    max-height: 60vh;
+    border-radius: 20px 20px 0 0;
+    border-left: none;
+    border-right: none;
+    border-bottom: none;
+    box-shadow: 0 -12px 48px rgba(0, 0, 0, 0.85);
+    z-index: 1100;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .nearby-panel-header {
+    padding: 14px 16px;
+    position: sticky;
+    top: 0;
+    background: rgba(8, 12, 28, 0.98);
+    z-index: 2;
+  }
+
+  /* ── 7. FLOATING ROUTE NAVIGATION HUD (MOBILE) ── */
+  .route-hud {
+    bottom: 12px;
+    left: 10px;
+    right: 10px;
+    width: auto;
+    max-width: 100%;
+    z-index: 1050;
+  }
+
+  .route-hud-card {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding: 12px 14px;
+    border-radius: 14px;
+  }
+
+  .route-hud-main {
+    gap: 10px;
+  }
+
+  .route-hud-name {
+    font-size: 13.5px;
+  }
+
+  .route-hud-actions {
+    justify-content: space-between;
+    width: 100%;
+    gap: 6px;
+  }
+
+  .route-mode-btn,
+  .route-nav-btn {
+    font-size: 11px;
+    padding: 6px 10px;
+  }
+
+  /* ── 8. PWA INSTALL BANNER (MOBILE) ── */
+  .pwa-install-banner {
+    bottom: 12px;
+    left: 10px;
+    right: 10px;
+    width: auto;
+    transform: translateY(140px);
+    padding: 10px 12px;
+    gap: 10px;
+  }
+
+  .pwa-install-banner.visible {
+    transform: translateY(0);
+  }
+
+  .pwa-install-icon {
+    width: 36px;
+    height: 36px;
+    font-size: 20px;
+  }
+
+  .pwa-install-text strong {
+    font-size: 12px;
+  }
+
+  .pwa-install-text span {
+    font-size: 10px;
+  }
+
+  .pwa-install-btn {
+    font-size: 11px;
+    padding: 7px 11px;
+  }
+
+  /* ── 9. SUBSCRIPTION MODAL (MOBILE) ── */
+  #subModal {
+    width: calc(100vw - 28px);
+    max-width: 380px;
+    padding: 24px 20px;
+    border-radius: 16px;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+
+  #subModal h2 {
+    font-size: 18px;
+  }
+
+  #subModal p {
+    font-size: 12px;
+    margin-bottom: 16px;
+  }
+}
+
+/* ── SMALL PHONE ULTRA-COMPACT BREAKPOINT (< 480px) ── */
+@media (max-width: 480px) {
+  :root {
+    --topbar-h: 50px;
+  }
+
+  .topbar {
+    padding: 0 8px;
+  }
+
+  /* Hide long brand text on very small screens to prevent topbar overflow */
+  .topbar-brand span[data-i18n="ui.publicDashboard"] {
+    display: none;
+  }
+
+  /* Compact alarm indicator */
+  #alarmIndicator span {
+    display: none;
+  }
+
+  #alarmIndicator {
+    padding: 4px;
+  }
+
+  /* Compact AI Advisor and Login */
+  #aiAdvisorBtn {
+    padding: 4px 7px;
+    font-size: 10.5px;
+  }
+
+  #subscribeBtn {
+    padding: 4px 8px;
+    font-size: 10.5px;
+  }
+
+  .authority-link {
+    display: none; /* Accessible via direct URL or shortcut on tiny screens */
+  }
+
+  .legend {
+    display: none; /* Reclaim map real estate on tiny screens */
+  }
+
+  #activityPanel {
+    display: none; /* Accessible via tap or panel on tiny screens */
+  }
+}
