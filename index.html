@@ -163,6 +163,13 @@
     <button class="sub-submit-btn" id="subSubmitBtn" onclick="window.handleSubscribe()">
       Subscribe to Emergency Alerts
     </button>
+
+    <div style="display:flex;gap:8px;margin-top:10px;">
+      <button type="button" class="sub-test-btn" id="testVibeBtn" onclick="window.testDeviceVibration()" style="width:100%;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);color:#cbd5e1;font-size:12px;font-weight:600;padding:9px;border-radius:8px;cursor:pointer;transition:all 0.2s;">
+        📳 Test 6-Sec Pocket Vibration
+      </button>
+    </div>
+
     <div class="sub-result" id="subResult"></div>
   </div>
 </div>
@@ -174,8 +181,27 @@
 <script type="module" src="src/index.js"></script>
 <script type="module">
   import { requestAdviceForAlert, openAdvisorPanel } from "./src/ui/aiAdvisorPanel.js";
+  import { triggerPocketVibration } from "./src/ui/alarmModule.js";
   window._aiRequestAdvice = requestAdviceForAlert;
   window._aiOpenPanel = openAdvisorPanel;
+
+  // Test vibration function for user diagnostics
+  window.testDeviceVibration = () => {
+    if ("vibrate" in navigator) {
+      triggerPocketVibration();
+      const statusEl = document.getElementById("subResult");
+      if (statusEl) {
+        statusEl.className = "sub-result success";
+        statusEl.textContent = "📳 Vibrating phone for 6 seconds (SOS Rhythm)!";
+      }
+    } else {
+      const statusEl = document.getElementById("subResult");
+      if (statusEl) {
+        statusEl.className = "sub-result error";
+        statusEl.textContent = "⚠ Vibration API is not supported on this device/browser.";
+      }
+    }
+  };
 
   // PWA Automatic Installation Prompt Handler
   let deferredPrompt = null;

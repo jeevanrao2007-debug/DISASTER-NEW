@@ -38,6 +38,25 @@ export function setupAudioUnlock() {
   soundBanner?.addEventListener("click", unlockAudio);
 }
 
+export function triggerPocketVibration() {
+  if ("vibrate" in navigator) {
+    try {
+      // 6-second heavy multi-pulse vibration pattern
+      navigator.vibrate([500, 200, 500, 200, 500, 200, 1000, 300, 1000, 300, 1000]);
+    } catch (e) {
+      console.warn("Vibration failed:", e);
+    }
+  }
+}
+
+export function stopPocketVibration() {
+  if ("vibrate" in navigator) {
+    try {
+      navigator.vibrate(0);
+    } catch (e) {}
+  }
+}
+
 export function enableCriticalUI() {
   criticalPending = true;
   criticalFlash?.classList.add("active");
@@ -47,6 +66,9 @@ export function enableCriticalUI() {
   void document.body.offsetWidth;
   document.body.classList.add("shake-active");
   setTimeout(() => document.body.classList.remove("shake-active"), 600);
+
+  // Trigger device vibration
+  triggerPocketVibration();
 
   if (audioUnlocked && !alarmPlaying) {
     alarmPlaying = true;
@@ -66,6 +88,7 @@ export function disableCriticalUI() {
   criticalPending = false;
   criticalFlash?.classList.remove("active");
   alarmIndicator?.classList.remove("active");
+  stopPocketVibration();
 
   if (alarmPlaying) {
     alarm.pause();
@@ -75,6 +98,7 @@ export function disableCriticalUI() {
 }
 
 export function dismissAlarm(alertId) {
+  stopPocketVibration();
   if (alarmPlaying) {
     alarm.pause();
     alarm.currentTime = 0;
