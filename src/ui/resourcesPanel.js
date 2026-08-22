@@ -1,14 +1,35 @@
 /* =========================================================
    src/ui/resourcesPanel.js
-   Nearby emergency resources side panel UI.
+   Nearby emergency resources side panel UI with free live routing.
    ========================================================= */
 
 import { fetchNearbyResources } from "../services/resourcesService.js";
+import { calculateRoute, getGoogleMapsDirectionsUrl } from "../services/routingService.js";
+import { drawRoute, clearRoute, getUserLocation, flyToMarker } from "./mapModule.js";
+import { showRouteHud, hideRouteHud, setRouteHudCallbacks } from "./routeHud.js";
+import { showToast } from "./toastModule.js";
 import { onLanguageChange, t, translateAlertType } from "../i18n/languageManager.js";
 
 const PANEL_ID = "nearbyResourcesPanel";
 let latestRequestToken = 0;
 let panelState = { mode: "idle", alertTypeRaw: "Alert", message: "", places: [] };
+let activePlace = null;
+let activeMode = "driving";
+
+// Wire callbacks for the floating Route HUD
+setRouteHudCallbacks({
+  onModeChange: async (newMode, state) => {
+    if (state?.destination) {
+      activeMode = newMode;
+      await navigateToPlace(state.destination, newMode, true);
+    }
+  },
+  onClose: () => {
+    clearRoute();
+    activePlace = null;
+    document.querySelectorAll(".nearby-card.active").forEach((el) => el.classList.remove("active"));
+  }
+});
 
 function iconFor(type) {
   if (type === "hospital") return "🏥";
@@ -46,7 +67,7 @@ function ensurePanel() {
         <h3>${t("ui.nearbyHelp", "Nearby Help")}</h3>
         <p id="nearbyResourcesMeta">${t("ui.nearbySelectPrompt", "Select an alert marker")}</p>
       </div>
-      <button class="nearby-close" type="button" aria-label="Close nearby resources panel">x</button>
+      <button class="nearby-close" type="button" aria-label="Close nearby resources panel">✕</button>
     </div>
     <div id="nearbyResourcesBody" class="nearby-panel-body">
       <div class="nearby-placeholder">${t("ui.nearbySelectPrompt", "Select an alert marker")}</div>
@@ -108,6 +129,68 @@ export function showResourcesPanelError(message = "Unable to load nearby resourc
   setPanelOpen(true);
 }
 
+/**
+ * Initiates free live routing from user's GPS position to the specified resource facility.
+ */
+export async function navigateToPlace(place, mode = "driving", keepPanel = false) {
+  if (!place || !Number.isFinite(place.lat) || !Number.isFinite(place.lng)) {
+    showToast("Routing Error", "Invalid facility coordinates.", "warning");
+    return;
+  }
+
+  activePlace = place;
+  activeMode = mode;
+
+  // Highlight card in panel
+  document.querySelectorAll(".nearby-card").forEach((card) => {
+    card.classList.toggle("active", card.dataset.id === place.id);
+  });
+
+  showToast("Calculating Route", `Finding ${mode} route to ${place.name}...`, "info");
+
+  try {
+    const userCoords = await getUserLocation();
+
+    const routeResult = await calculateRoute({
+      originLat: userCoords.lat,
+      originLng: userCoords.lng,
+      destLat: place.lat,
+      destLng: place.lng,
+      mode
+    });
+
+    drawRoute({
+      coordinates: routeResult.coordinates,
+      destination: place,
+      mode
+    });
+
+    showRouteHud({
+      destination: place,
+      routeResult,
+      userCoords
+    });
+
+    showToast(
+      `Route Ready: ${place.name}`,
+      `${routeResult.distanceKm} km · ${routeResult.durationMinutes} min ${mode}`,
+      "success"
+    );
+
+    // On mobile screens, collapse panel so user can see map clearly
+    if (window.innerWidth < 768 && !keepPanel) {
+      hideResourcesPanel();
+    }
+  } catch (err) {
+    console.error("[resourcesPanel] Navigation failed:", err);
+    showToast(
+      "Location Needed",
+      "Please allow location access to calculate directions from where you are.",
+      "warning"
+    );
+  }
+}
+
 export function showResourcesPanelData(places = []) {
   panelState = { ...panelState, mode: "data", places };
   if (!places.length) {
@@ -122,24 +205,34 @@ export function showResourcesPanelData(places = []) {
   }
 
   const cards = places
-    .slice(0, 5)
+    .slice(0, 6)
     .map((place) => {
       const icon = iconFor(place.type);
       const type = labelFor(place.type);
       const name = escapeHtml(place.name);
       const vicinity = escapeHtml(place.vicinity || "Address unavailable");
       const distance = Number(place.distanceKm || 0).toFixed(2);
+      const placeJson = escapeHtml(JSON.stringify(place));
 
       return `
-        <article class="nearby-card">
+        <article class="nearby-card" data-id="${escapeHtml(place.id)}" data-place='${placeJson}'>
           <div class="nearby-icon" aria-hidden="true">${icon}</div>
           <div class="nearby-content">
             <div class="nearby-top-row">
-              <strong>${name}</strong>
+              <strong class="nearby-title">${name}</strong>
               <span class="nearby-distance">${distance} km</span>
             </div>
             <div class="nearby-type">${type}</div>
             <div class="nearby-vicinity">${vicinity}</div>
+
+            <div class="nearby-actions">
+              <button class="nearby-action-btn primary nearby-route-trigger" title="Get live turn-by-turn route">
+                🚗 Route Here
+              </button>
+              <button class="nearby-action-btn secondary nearby-focus-trigger" title="Center on map">
+                📍 Locate
+              </button>
+            </div>
           </div>
         </article>
       `;
@@ -148,6 +241,31 @@ export function showResourcesPanelData(places = []) {
 
   setBodyHtml(cards);
   setPanelOpen(true);
+
+  // Attach card event handlers
+  const panel = ensurePanel();
+  panel.querySelectorAll(".nearby-card").forEach((card) => {
+    const rawData = card.getAttribute("data-place");
+    if (!rawData) return;
+    const place = JSON.parse(rawData);
+
+    // Route trigger
+    card.querySelector(".nearby-route-trigger")?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      navigateToPlace(place, "driving");
+    });
+
+    // Locate trigger
+    card.querySelector(".nearby-focus-trigger")?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      flyToMarker([place.lat, place.lng], 15);
+    });
+
+    // Whole card click triggers route
+    card.addEventListener("click", () => {
+      navigateToPlace(place, "driving");
+    });
+  });
 }
 
 function rerenderState() {

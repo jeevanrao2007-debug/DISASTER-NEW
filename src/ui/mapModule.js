@@ -1,7 +1,7 @@
 /* =========================================================
    src/ui/mapModule.js
-   Handles Leaflet map initialization, severity colors, and
-   animated marker creation.
+   Handles Leaflet map initialization, severity colors,
+   animated markers, user GPS location, and free route rendering.
    ========================================================= */
 
 import { t, translateAlertType, translateSeverity, translateDynamicText } from "../i18n/languageManager.js";
@@ -15,6 +15,11 @@ function color(severity) {
 }
 
 let mapInstance;
+let userMarker = null;
+let destinationMarker = null;
+let activeRouteGlowLayer = null;
+let activeRouteMainLayer = null;
+let lastKnownUserLocation = null;
 
 function formatTime(data = {}) {
   return typeof data.createdAt === "number"
@@ -45,7 +50,7 @@ function buildDefaultPopup({ data, id, isAdmin, sev, colorHex }) {
   popupHtml += `<br><button class="popup-ai-btn" onclick='window._aiRequestAdvice && window._aiRequestAdvice(JSON.parse(this.dataset.alert))' data-alert="${aiData}">✦ Ask AI Safety Advisor</button>`;
 
   if (isAdmin) {
-    popupHtml += `<br><button data-action="delete" data-alert-id="${id}" style="padding:4px 10px;background:#dc2626;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px">🗑 Remove Alert</button>`;
+    popupHtml += `<br><button data-action="delete" data-alert-id="${id}" style="padding:4px 10px;background:#dc2626;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;margin-top:6px;">🗑 Remove Alert</button>`;
   }
 
   popupHtml += "</div>";
@@ -65,6 +70,180 @@ export function initMap(containerId = "map", center = [13.0827, 80.2707], zoom =
 
 export function getMap() {
   return mapInstance;
+}
+
+/**
+ * Creates and updates the pulsating blue GPS marker for the user's current position.
+ */
+export function setUserLocationMarker(lat, lng) {
+  if (!mapInstance) return null;
+  lastKnownUserLocation = { lat: Number(lat), lng: Number(lng) };
+
+  const html = `
+    <div class="user-gps-marker" title="Your Location">
+      <div class="user-gps-pulse"></div>
+      <div class="user-gps-core"></div>
+    </div>
+  `;
+
+  const icon = L.divIcon({
+    html,
+    className: "user-gps-icon-wrapper",
+    iconSize: [32, 32],
+    iconAnchor: [16, 16]
+  });
+
+  if (userMarker) {
+    userMarker.setLatLng([lat, lng]);
+  } else {
+    userMarker = L.marker([lat, lng], { icon, zIndexOffset: 1000 }).addTo(mapInstance);
+    userMarker.bindPopup(`
+      <div style="font-family:'Inter',sans-serif;text-align:center;padding:4px;">
+        <b style="color:#38bdf8;font-size:13px;">📍 You are here</b><br>
+        <span style="font-size:11px;color:#94a3b8;">${lat.toFixed(4)}, ${lng.toFixed(4)}</span>
+      </div>
+    `);
+  }
+
+  return userMarker;
+}
+
+/**
+ * Returns the cached or current GPS location of the user.
+ */
+export function getUserLocation() {
+  return new Promise((resolve, reject) => {
+    if (lastKnownUserLocation) {
+      resolve(lastKnownUserLocation);
+      return;
+    }
+
+    if (!("geolocation" in navigator)) {
+      reject(new Error("Geolocation not supported"));
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        setUserLocationMarker(coords.lat, coords.lng);
+        resolve(coords);
+      },
+      (err) => {
+        reject(err);
+      },
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
+    );
+  });
+}
+
+/**
+ * Centers and zooms map onto user's location.
+ */
+export async function locateUserAndCenter() {
+  try {
+    const coords = await getUserLocation();
+    if (coords && mapInstance) {
+      mapInstance.flyTo([coords.lat, coords.lng], 14, { animate: true, duration: 1.2 });
+      if (userMarker) {
+        userMarker.openPopup();
+      }
+      return coords;
+    }
+  } catch (e) {
+    console.warn("[mapModule] Could not locate user:", e.message);
+    throw e;
+  }
+}
+
+/**
+ * Draws a high-visibility route polyline on the Leaflet map from origin to destination.
+ */
+export function drawRoute({ coordinates, destination, mode = "driving" }) {
+  if (!mapInstance || !Array.isArray(coordinates) || coordinates.length < 2) return;
+
+  clearRoute();
+
+  const isWalking = mode === "walking";
+  const glowColor = isWalking ? "#10b981" : "#38bdf8";
+  const mainColor = isWalking ? "#34d399" : "#0284c7";
+
+  // Base wider glowing polyline
+  activeRouteGlowLayer = L.polyline(coordinates, {
+    color: glowColor,
+    weight: 8,
+    opacity: 0.45,
+    lineCap: "round",
+    lineJoin: "round",
+    className: "route-poly-glow"
+  }).addTo(mapInstance);
+
+  // Core sharp polyline
+  activeRouteMainLayer = L.polyline(coordinates, {
+    color: mainColor,
+    weight: 4.5,
+    opacity: 0.95,
+    dashArray: isWalking ? "6, 8" : undefined,
+    lineCap: "round",
+    lineJoin: "round",
+    className: "route-poly-main"
+  }).addTo(mapInstance);
+
+  // Add destination marker with icon
+  if (destination && Number.isFinite(destination.lat) && Number.isFinite(destination.lng)) {
+    const typeIcon = destination.type === "hospital" ? "🏥" : destination.type === "police" ? "🚔" : "🏠";
+    const destHtml = `
+      <div class="dest-route-pin" title="${destination.name || 'Destination'}">
+        <div class="dest-route-icon">${typeIcon}</div>
+      </div>
+    `;
+
+    const destDivIcon = L.divIcon({
+      html: destHtml,
+      className: "dest-pin-wrapper",
+      iconSize: [36, 36],
+      iconAnchor: [18, 36],
+      popupAnchor: [0, -36]
+    });
+
+    destinationMarker = L.marker([destination.lat, destination.lng], {
+      icon: destDivIcon,
+      zIndexOffset: 990
+    }).addTo(mapInstance);
+
+    destinationMarker.bindPopup(`
+      <div style="font-family:'Inter',sans-serif;min-width:140px;">
+        <b style="color:#38bdf8;">${destination.name || 'Emergency Resource'}</b><br>
+        <span style="font-size:11px;color:#94a3b8;">${destination.vicinity || ''}</span>
+      </div>
+    `);
+  }
+
+  // Smoothly fit map bounds to display the whole route
+  const bounds = L.latLngBounds(coordinates);
+  mapInstance.fitBounds(bounds, {
+    paddingTopLeft: [50, 50],
+    paddingBottomRight: [50, 180], // extra bottom padding for floating route HUD
+    maxZoom: 16
+  });
+}
+
+/**
+ * Removes active navigation route lines and destination pin from the map.
+ */
+export function clearRoute() {
+  if (activeRouteGlowLayer && mapInstance) {
+    mapInstance.removeLayer(activeRouteGlowLayer);
+    activeRouteGlowLayer = null;
+  }
+  if (activeRouteMainLayer && mapInstance) {
+    mapInstance.removeLayer(activeRouteMainLayer);
+    activeRouteMainLayer = null;
+  }
+  if (destinationMarker && mapInstance) {
+    mapInstance.removeLayer(destinationMarker);
+    destinationMarker = null;
+  }
 }
 
 /**

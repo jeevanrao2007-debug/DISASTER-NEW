@@ -1,4 +1,4 @@
-import { initMap, addMarker, removeMarker, flyToMarker, fitMapBounds, refreshMarkerPopup } from "./ui/mapModule.js";
+import { initMap, addMarker, removeMarker, flyToMarker, fitMapBounds, refreshMarkerPopup, locateUserAndCenter, getUserLocation } from "./ui/mapModule.js";
 import { setupAudioUnlock, enableCriticalUI, disableCriticalUI } from "./ui/alarmModule.js";
 import { showToast } from "./ui/toastModule.js";
 import { addActivity } from "./ui/activityModule.js";
@@ -23,6 +23,7 @@ const overlay = document.getElementById("subModalOverlay");
 const subBtn = document.getElementById("subscribeBtn");
 const subResult = document.getElementById("subResult");
 const subSubmit = document.getElementById("subSubmitBtn");
+const locateFab = document.getElementById("locateMeFab");
 
 function formatLiveStatus(count) {
   return t("messages.liveCount", `LIVE · ${count} ALERT${count !== 1 ? "S" : ""}`, {
@@ -44,6 +45,24 @@ setupLanguageToggle();
 applyDocumentTranslations();
 setupAudioUnlock();
 initPushService();
+
+// Quietly check for GPS location on startup if already granted
+if ("geolocation" in navigator) {
+  getUserLocation().catch(() => {});
+}
+
+// Locate Me button handler
+locateFab?.addEventListener("click", async () => {
+  try {
+    locateFab.style.transform = "scale(0.9)";
+    setTimeout(() => { locateFab.style.transform = ""; }, 150);
+    showToast("Locating", "Finding your GPS coordinates...", "info");
+    await locateUserAndCenter();
+    showToast("Located", "Centered map on your location.", "success");
+  } catch (err) {
+    showToast("Location Error", "Could not get your location. Please check browser permissions.", "warning");
+  }
+});
 
 let heartbeatTimer;
 function bumpHeartbeat() {
