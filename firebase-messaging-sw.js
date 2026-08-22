@@ -15,9 +15,9 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
-// Handle background push messages
+// Handle background push messages with heavy 6-second pocket vibration
 messaging.onBackgroundMessage((payload) => {
-  console.log('[firebase-messaging-sw.js] Received background message: ', payload);
+  console.log('[firebase-messaging-sw.js] Received background emergency message: ', payload);
 
   const title = payload.notification?.title ||
     (payload.data?.type ? `🚨 ${payload.data.type} Alert Nearby` : '🚨 Disaster Alert Nearby');
@@ -25,15 +25,18 @@ messaging.onBackgroundMessage((payload) => {
   const body = payload.notification?.body ||
     payload.data?.description ||
     payload.data?.desc ||
-    'A critical emergency alert was reported near your location.';
+    'A critical emergency alert was reported near your location. Take immediate precautions.';
 
   const notificationOptions = {
     body: body,
     icon: payload.notification?.icon || '/favicon.ico',
     badge: '/favicon.ico',
-    vibrate: [200, 100, 200, 100, 200], // SOS vibration pattern
-    tag: payload.data?.alertId || 'disaster-alert',
-    renotify: true,
+    // Heavy 6-second high-intensity multi-pulse vibration pattern for pocket/pants detection
+    vibrate: [500, 200, 500, 200, 500, 200, 1000, 300, 1000, 300, 1000],
+    requireInteraction: true, // Remains on lock screen until user touches or dismisses
+    renotify: true,           // Buzzes again if consecutive updates arrive
+    tag: payload.data?.alertId || 'critical-emergency-alert',
+    silent: false,
     data: {
       url: payload.fcmOptions?.link || payload.data?.url || '/',
       ...payload.data

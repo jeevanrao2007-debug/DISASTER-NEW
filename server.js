@@ -470,13 +470,30 @@ app.post("/dispatchAlert", async (req, res) => {
                 body: alert.description || `${alert.type} emergency reported in your area.`
               },
               webpush: {
+                headers: {
+                  Urgency: "high",
+                  TTL: "86400"
+                },
                 notification: {
-                  vibrate: [200, 100, 200, 100, 200],
+                  title: `🚨 ${alert.type} Alert Nearby`,
+                  body: alert.description || `${alert.type} emergency reported in your area. Take immediate precautions.`,
+                  vibrate: [500, 200, 500, 200, 500, 200, 1000, 300, 1000, 300, 1000],
+                  requireInteraction: true,
+                  renotify: true,
+                  tag: "critical-emergency-alert",
                   icon: "/favicon.ico",
                   badge: "/favicon.ico"
                 },
                 fcmOptions: {
                   link: DASHBOARD_URL
+                }
+              },
+              android: {
+                priority: "high",
+                notification: {
+                  priority: "max",
+                  defaultVibrateTimings: false,
+                  vibrateTimingsMillis: [500, 200, 500, 200, 500, 200, 1000, 300, 1000, 300, 1000]
                 }
               },
               data: {

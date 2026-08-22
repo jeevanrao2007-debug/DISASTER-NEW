@@ -1,0 +1,31 @@
+{
+  "name": "Disaster Alert - Emergency Operations",
+  "short_name": "DisasterAlert",
+  "description": "Real-time emergency monitoring, geofenced pocket push notifications, and live crisis management.",
+  "start_url": "/",
+  "id": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#03040a",
+  "theme_color": "#dc2626",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    }
+  ],
+  "categories": ["utilities", "news", "weather"],
+  "shortcuts": [
+    {
+      "name": "Live Map",
+      "url": "/",
+      "description": "View live disaster map"
+    },
+    {
+      "name": "Authority Login",
+      "url": "/login.html",
+      "description": "Authority operator login"
+    }
+  ]
+}

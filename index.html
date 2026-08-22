@@ -4,10 +4,19 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Disaster Alert — Live Emergency Operations</title>
-  <meta name="description" content="Real-time public disaster monitoring and crisis management dashboard with live interactive map, GPS routing, and instant alerts.">
+  <meta name="description" content="Real-time public disaster monitoring and crisis management dashboard with live interactive map, GPS routing, and instant pocket push alerts.">
 
-  <!-- Favicon -->
+  <!-- PWA Manifest & Mobile Capability Tags -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#dc2626">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="DisasterAlert">
+
+  <!-- Favicon & Touch Icon -->
   <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <link rel="apple-touch-icon" href="favicon.ico">
 
   <!-- Leaflet Maps CSS & JS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
@@ -107,6 +116,19 @@
 <div id="criticalFlash"></div>
 
 <!-- ========================================================
+   PWA INSTALL BANNER (POCKET ALERTS)
+   ======================================================== -->
+<div id="pwaInstallBanner" class="pwa-install-banner">
+  <div class="pwa-install-icon">📲</div>
+  <div class="pwa-install-text">
+    <strong>Install App for Pocket Emergency Alerts</strong>
+    <span>Get strong 6-sec SOS vibrations even when your phone is locked</span>
+  </div>
+  <button id="pwaInstallBtn" class="pwa-install-btn">Install App</button>
+  <button id="pwaDismissBtn" class="pwa-dismiss-btn" aria-label="Dismiss">✕</button>
+</div>
+
+<!-- ========================================================
    AI SAFETY ADVISOR PANEL
    ======================================================== -->
 <aside id="aiAdvisorPanel" class="ai-advisor-panel" role="dialog" aria-labelledby="aiAdvisorTitle">
@@ -154,6 +176,44 @@
   import { requestAdviceForAlert, openAdvisorPanel } from "./src/ui/aiAdvisorPanel.js";
   window._aiRequestAdvice = requestAdviceForAlert;
   window._aiOpenPanel = openAdvisorPanel;
+
+  // PWA Automatic Installation Prompt Handler
+  let deferredPrompt = null;
+  const pwaBanner = document.getElementById("pwaInstallBanner");
+  const pwaInstallBtn = document.getElementById("pwaInstallBtn");
+  const pwaDismissBtn = document.getElementById("pwaDismissBtn");
+
+  window.addEventListener("beforeinstallprompt", (e) => {
+    // Prevent standard minibar on mobile
+    e.preventDefault();
+    deferredPrompt = e;
+
+    const isDismissed = sessionStorage.getItem("pwa_prompt_dismissed");
+    if (!isDismissed && pwaBanner) {
+      setTimeout(() => {
+        pwaBanner.classList.add("visible");
+      }, 2500);
+    }
+  });
+
+  pwaInstallBtn?.addEventListener("click", async () => {
+    if (!deferredPrompt) return;
+    pwaBanner.classList.remove("visible");
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    console.log("[PWA] Install prompt outcome:", outcome);
+    deferredPrompt = null;
+  });
+
+  pwaDismissBtn?.addEventListener("click", () => {
+    pwaBanner.classList.remove("visible");
+    sessionStorage.setItem("pwa_prompt_dismissed", "true");
+  });
+
+  window.addEventListener("appinstalled", () => {
+    console.log("[PWA] Application successfully installed.");
+    pwaBanner?.classList.remove("visible");
+  });
 </script>
 
 </body>
