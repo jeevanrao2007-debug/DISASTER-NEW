@@ -24,82 +24,70 @@ firebase.initializeApp({
   appId: "1:359144434898:web:844f9278880b73291c110b"
 });
 
-const messaging = firebase.messaging();
+// 6-Second Multi-Pulse Vibration Sequence for Supported Web Push Devices
+const EMERGENCY_VIBRATION_PATTERN = [500, 200, 500, 200, 500, 200, 1000, 300, 1000, 300, 1000];
 
-// 6-Second Heavy Multi-Pulse Vibration Sequence for Android Pockets
-const HEAVY_POCKET_VIBRATION = [500, 200, 500, 200, 500, 200, 1000, 300, 1000, 300, 1000];
+// ============================================================================
+// Unified Single Push Event Handler (Keeps worker alive via event.waitUntil)
+// ============================================================================
+self.addEventListener('push', (event) => {
+  console.log('[SW] Push received');
 
-// Handle background push messages
-messaging.onBackgroundMessage((payload) => {
-  console.log('[firebase-messaging-sw.js] Received emergency background push:', payload);
+  let payload = {};
+  if (event.data) {
+    try {
+      payload = event.data.json();
+    } catch (parseErr) {
+      console.warn('[SW] Non-JSON push payload received, falling back to text');
+      payload = { data: { body: event.data.text() } };
+    }
+  }
 
-  const title = payload.notification?.title ||
-    payload.data?.title ||
-    (payload.data?.type ? `🚨 ${payload.data.type} Alert Nearby` : '🚨 Disaster Alert Nearby');
+  const notificationData = payload.notification || {};
+  const customData = payload.data || {};
 
-  const body = payload.notification?.body ||
-    payload.data?.body ||
-    payload.data?.description ||
-    payload.data?.desc ||
+  const title = notificationData.title ||
+    customData.title ||
+    (customData.type ? `🚨 ${customData.type} Alert Nearby` : '🚨 Emergency Disaster Alert');
+
+  const body = notificationData.body ||
+    customData.body ||
+    customData.description ||
+    customData.desc ||
     'A critical emergency alert was reported near your location. Take immediate precautions.';
+
+  const targetUrl = payload.fcmOptions?.link || customData.url || '/';
+  const tag = notificationData.tag || customData.alertId || 'critical-emergency-alert';
 
   const notificationOptions = {
     body: body,
-    icon: payload.notification?.icon || '/favicon.ico',
-    badge: '/favicon.ico',
-    vibrate: HEAVY_POCKET_VIBRATION,
+    icon: notificationData.icon || '/assets/icons/icon-192.png',
+    badge: notificationData.badge || '/assets/icons/icon-192.png',
+    vibrate: EMERGENCY_VIBRATION_PATTERN,
     requireInteraction: true,
     renotify: true,
-    tag: payload.data?.alertId || 'critical-emergency-alert',
+    tag: tag,
     silent: false,
     data: {
-      url: payload.fcmOptions?.link || payload.data?.url || '/',
-      ...payload.data
+      url: targetUrl,
+      ...customData
     }
   };
 
-  self.registration.showNotification(title, notificationOptions);
-});
-
-// Direct Web Push Event Fallback (ensures vibration triggers even if FCM compat bypasses onBackgroundMessage)
-self.addEventListener('push', (event) => {
-  if (!event.data) return;
-
-  try {
-    const raw = event.data.json();
-    console.log('[SW:push] Raw push payload received:', raw);
-
-    const title = raw.notification?.title ||
-      raw.data?.title ||
-      (raw.data?.type ? `🚨 ${raw.data.type} Alert Nearby` : '🚨 Disaster Alert Nearby');
-
-    const body = raw.notification?.body ||
-      raw.data?.body ||
-      raw.data?.description ||
-      'Critical emergency alert reported nearby.';
-
-    event.waitUntil(
-      self.registration.showNotification(title, {
-        body: body,
-        icon: '/favicon.ico',
-        badge: '/favicon.ico',
-        vibrate: HEAVY_POCKET_VIBRATION,
-        requireInteraction: true,
-        renotify: true,
-        tag: raw.data?.alertId || 'critical-emergency-alert',
-        silent: false,
-        data: {
-          url: raw.fcmOptions?.link || raw.data?.url || '/',
-          ...raw.data
-        }
+  event.waitUntil(
+    self.registration.showNotification(title, notificationOptions)
+      .then(() => {
+        console.log('[SW] Notification displayed');
       })
-    );
-  } catch (err) {
-    console.warn('[SW:push] Fallback parsing push payload:', err);
-  }
+      .catch((displayErr) => {
+        console.error('[SW] Failed to display notification:', displayErr);
+      })
+  );
 });
 
-// Handle notification click to open or focus the app
+// ============================================================================
+// Handle Notification Click to Focus or Open the PWA
+// ============================================================================
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
 

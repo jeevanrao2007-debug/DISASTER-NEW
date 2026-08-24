@@ -84,8 +84,8 @@
   <div class="pab-left">
     <div class="pab-icon">📳</div>
     <div class="pab-info">
-      <strong id="pabTitle">Lock-Screen Pocket Alerts</strong>
-      <span id="pabSubtitle">6-Sec SOS vibration when phone is locked</span>
+      <strong id="pabTitle">Emergency Push Alerts</strong>
+      <span id="pabSubtitle">High-priority alerts with sound & vibration when supported</span>
     </div>
   </div>
   <div class="pab-actions">
@@ -95,7 +95,7 @@
     <button type="button" id="pabInstallBtn" class="pab-install-btn" onclick="window.handleInstallApp()" title="Download & Install Android App">
       📲 Install App
     </button>
-    <button type="button" id="pabTestBtn" class="pab-test-btn" onclick="window.testDeviceVibration()" title="Test 6-sec vibration">
+    <button type="button" id="pabTestBtn" class="pab-test-btn" onclick="window.testDeviceVibration()" title="Test vibration">
       ⚡ Test
     </button>
   </div>
@@ -145,8 +145,8 @@
 <div id="pwaInstallBanner" class="pwa-install-banner">
   <div class="pwa-install-icon">📲</div>
   <div class="pwa-install-text">
-    <strong>Install App for Pocket Emergency Alerts</strong>
-    <span>Get strong 6-sec SOS vibrations even when your phone is locked</span>
+    <strong>Install App for Emergency Alerts</strong>
+    <span>Get high-priority notifications with sound and vibration when supported by device settings</span>
   </div>
   <button id="pwaInstallBtn" class="pwa-install-btn">Install App</button>
   <button id="pwaDismissBtn" class="pwa-dismiss-btn" aria-label="Dismiss">✕</button>
@@ -183,8 +183,8 @@
     <div style="background:rgba(220,38,38,0.12);border:1px solid rgba(220,38,38,0.3);border-radius:12px;padding:12px;margin-bottom:16px;">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
         <div style="text-align:left;">
-          <strong style="display:block;font-size:12.5px;color:#f8fafc;">📳 Lock-Screen Pocket Alerts</strong>
-          <span style="font-size:11px;color:#94a3b8;">Heavy 6-sec SOS vibration when screen locked</span>
+          <strong style="display:block;font-size:12.5px;color:#f8fafc;">📳 Emergency Push Notifications</strong>
+          <span style="font-size:11px;color:#94a3b8;">High-priority alerts with sound & vibration when supported</span>
         </div>
         <button type="button" id="enablePushBtn" onclick="window.handleEnablePush()" style="background:linear-gradient(135deg,#dc2626,#b91c1c);color:white;border:none;padding:8px 12px;border-radius:8px;font-size:11.5px;font-weight:700;cursor:pointer;white-space:nowrap;transition:all 0.2s;">
           Enable Push
@@ -203,7 +203,7 @@
 
     <div style="display:flex;gap:8px;margin-top:10px;">
       <button type="button" class="sub-test-btn" id="testVibeBtn" onclick="window.testDeviceVibration()" style="width:100%;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);color:#cbd5e1;font-size:12px;font-weight:600;padding:9px;border-radius:8px;cursor:pointer;transition:all 0.2s;">
-        📳 Test 6-Sec Pocket Vibration
+        📳 Test Device Vibration
       </button>
     </div>
 
@@ -242,8 +242,8 @@
         if (btn) { btn.textContent = "✔ Enabled"; btn.style.background = "linear-gradient(135deg,#16a34a,#15803d)"; }
         if (pabBtn) { pabBtn.textContent = "✔ Active"; pabBtn.style.background = "linear-gradient(135deg,#16a34a,#15803d)"; }
         if (pabBar) pabBar.classList.add("enabled");
-        if (pabTitle) pabTitle.textContent = "✔ Pocket Alerts & Vibration Active";
-        if (badge) { badge.style.color = "#86efac"; badge.textContent = "✔ Registered! Your phone will vibrate on critical alerts."; }
+        if (pabTitle) pabTitle.textContent = "✔ Emergency Push Alerts Active";
+        if (badge) { badge.style.color = "#86efac"; badge.textContent = "✔ Registered! High-priority alerts enabled for your device."; }
         // Test a short pulse to confirm
         if ("vibrate" in navigator) navigator.vibrate([200, 100, 200]);
       } else {

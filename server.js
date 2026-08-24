@@ -472,12 +472,15 @@ app.post("/dispatchAlert", async (req, res) => {
       if (pushEligibleCount > 0) {
         const messaging = getAdminMessaging();
 
+        const EMERGENCY_VIBRATION_PATTERN = [500, 200, 500, 200, 500, 200, 1000, 300, 1000, 300, 1000];
+        const alertTag = String(alert.createdAt || Date.now());
+
         for (const sub of targetSubscribers) {
           const pushTitle = `🚨 ${alert.type} Alert Nearby`;
           const pushBody = alert.description || `${alert.type} emergency reported in your area. Take immediate precautions.`;
 
-          // Data-only payload ensures Android Chrome hands full control to our Service Worker
-          // without intercepting with the browser's default no-vibration notification handler.
+          // Hybrid WebPush payload: includes both webpush.notification (for OS-level display when app is closed)
+          // and data payload (for foreground app handling).
           const payload = {
             webpush: {
               headers: {
@@ -486,6 +489,16 @@ app.post("/dispatchAlert", async (req, res) => {
               },
               fcmOptions: {
                 link: DASHBOARD_URL
+              },
+              notification: {
+                title: String(pushTitle),
+                body: String(pushBody),
+                icon: "/assets/icons/icon-192.png",
+                badge: "/assets/icons/icon-192.png",
+                tag: alertTag,
+                requireInteraction: true,
+                renotify: true,
+                vibrate: EMERGENCY_VIBRATION_PATTERN
               }
             },
             android: {
@@ -500,19 +513,20 @@ app.post("/dispatchAlert", async (req, res) => {
               lat: String(alert.lat ?? ""),
               lng: String(alert.lng ?? ""),
               url: String(DASHBOARD_URL),
-              alertId: String(alert.createdAt || Date.now())
+              alertId: alertTag
             },
             token: sub.token
           };
 
           try {
+            console.log(`[FCM] Sending notification for alert "${alert.type}" to subscriber (key=${sub.dbKey})...`);
             const fcmResponse = await messaging.send(payload);
-            console.log(`[dispatchAlert:Push] Successfully sent FCM push to subscriber (key=${sub.dbKey}):`, fcmResponse);
+            console.log(`[FCM] Message sent successfully (subKey=${sub.dbKey}, response=${fcmResponse})`);
             pushSent++;
           } catch (fcmErr) {
             pushFailed++;
             const errMsg = fcmErr.message || String(fcmErr);
-            console.error(`[dispatchAlert:Push] FCM send failed for subscriber (key=${sub.dbKey}):`, errMsg);
+            console.error(`[FCM] Send failed for subscriber (key=${sub.dbKey}):`, errMsg);
             pushErrors.push({ tokenKey: sub.dbKey, error: errMsg });
 
             // Automatically clean up invalid/expired tokens
